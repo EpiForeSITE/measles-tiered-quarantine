@@ -1,0 +1,586 @@
+
+
+``` r
+library(epiworldR)
+```
+
+    Thank you for using epiworldR! Please consider citing it in your work.
+    You can find the citation information by running
+      citation("epiworldR")
+
+``` r
+library(data.table)
+
+n_sims    <- 1000
+n_agents  <- 600
+n_classes <- 20
+n_agents_per_class <- n_agents / n_classes
+n_days    <- 100
+n_threads <- 10
+
+# Makesure it's even
+stopifnot(n_agents_per_class %% 1 == 0)
+
+within_class_contact_rate <- 0.83
+between_class_contact_rate <- 1 - within_class_contact_rate
+R0 <- 15
+contact_rate <- 20
+
+# Creating the mixing matrix
+contact_matrix <- matrix(
+  between_class_contact_rate / (n_classes - 1),
+  nrow = n_classes,
+  ncol = n_classes
+)
+diag(contact_matrix) <- within_class_contact_rate
+
+# Disease parameters
+incubation <- 12
+prodromal   <- 4
+rash        <- 3
+
+
+# Calibrating infection probability
+p_infect <- R0 / (contact_rate) * (1/prodromal)
+```
+
+This document illustrates an experiment using the `epiworldR` package to
+simulate measles transmission under a tiered quarantine strategy. The
+simulation settings are as follows:
+
+- Individual school with 600 students distributed across 20 classes (30
+  students per class).
+- The contact rate is given by our previous estimates for within-class
+  and between-class interactions: 83% of contacts occur within the same
+  class, while 17% occur between different classes.
+- The basic reproduction number (R0) is set to 15, reflecting the high
+  transmissibility of measles.
+- Contact tracing is assumed to be 100% effective, as agents’
+  willingness to isolate and quarantine.
+
+We will test the model using the following scenarios:
+
+- 50%, 80%, and 95% vaccination coverage.
+- Quarantine days set to 0, 7, 14, and 21 days.
+
+## Baseline scenario
+
+The following function sets up and runs the baseline simulation, where
+90% of individuals are vaccinated, and quarantine lasts for 21 days:
+
+``` r
+#' Runs the simulation with specified parameters.
+#' @param quarantine_days A vector of length 3 indicating the number of quarantine days for each risk level.
+#' @param prop_vaccinated Proportion of vaccinated individuals in the population.
+#' @return
+#' A data.table containing the total history of the simulation.
+simulator <- function(
+  quarantine_days = c(21L, 21L, 21L),
+  prop_vaccinated = 0.9
+) {
+  # Building the model
+  model_baseline <- ModelMeaslesMixingRiskQuarantine(
+    n = n_agents,
+    prevalence = 1 / 600,
+    contact_matrix = contact_matrix,
+    transmission_rate = p_infect,
+    prop_vaccinated = prop_vaccinated,
+    detection_rate_quarantine = 0.0,
+    contact_tracing_days_prior = 7,
+    quarantine_period_high = quarantine_days[1],
+    quarantine_period_medium = quarantine_days[2],
+    quarantine_period_low = quarantine_days[3]
+  )
+
+  # Creating entities
+  for (i in 1:n_classes) {
+    model_baseline |>
+      add_entity(
+        entity("Class", n_agents_per_class, as_proportion = FALSE)
+      )
+  }
+
+  # Running the simulation multiple times
+  model_baseline |>
+    run_multiple(
+      ndays = n_days,
+      nsims = n_sims,
+      seed = 221,
+      saver = make_saver("total_hist"),
+      nthreads = n_threads
+    )
+
+  # Getting the results
+  ans_baseline <- model_baseline |>
+    run_multiple_get_results(freader = data.table::fread, nthreads = 1L)
+
+  # Returning the total result
+  ans <- ans_baseline$total_hist
+
+  # Extracting the final counts
+  ans[date == max(date),][
+    (state != "Susceptible") &
+          (state != "Susceptible Quarantine"),
+    .(
+      total_infected = sum(counts)
+    ),
+    by = .(sim_num)
+  ]
+}
+```
+
+We will also tabulate the results for easier comparison:
+
+``` r
+tabulator <- function(ans) {
+  scenario_names <- names(ans)
+    data.table(
+      Scenario = scenario_names,
+      `Outbreak size % (mean)` = sapply(
+        scenario_names,
+        function(x) mean(ans[[x]]$total_infected)
+      ) / n_agents * 100,
+      `95% CI` = sapply(
+        scenario_names,
+        function(x) {
+          ci <- quantile(
+            ans[[x]]$total_infected / n_agents * 100,
+            probs = c(0.025, 0.975)
+          )
+          sprintf("(% 5.2f, % 5.2f)", ci[1], ci[2])
+        }
+      )
+    ) |> knitr::kable()
+}
+```
+
+Let’s try running the baseline simulation:
+
+``` r
+ans_baseline_counts <- simulator()
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+We can now visualize and summarize the results:
+
+``` r
+library(ggplot2)
+
+ggplot(ans_baseline_counts, aes(x = total_infected)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(
+    title = "Distribution of Total Infected Individuals - Baseline Scenario",
+    x = "Total Infected Individuals",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+![](README_files/figure-commonmark/unnamed-chunk-5-1.png)
+
+## Scenario: No vaccination, only one risk level quarantined
+
+``` r
+ans_none <- simulator(
+  quarantine_days = c(0L, 0L, 0L), prop_vaccinated = 0.0
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_only_high <- simulator(
+  quarantine_days = c(21L, 0L, 0L), prop_vaccinated = 0.0
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_only_medium <- simulator(
+  quarantine_days = c(0L, 21L, 0L), prop_vaccinated = 0.0
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_only_low <- simulator(
+  quarantine_days = c(0L, 0L, 21L), prop_vaccinated = 0.0
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+# Tabulating the results
+tabulator(
+  list(
+    "No Quarantine" = ans_none,
+    "Only High Risk Quarantine" = ans_only_high,
+    "Only Medium Risk Quarantine" = ans_only_medium,
+    "Only Low Risk Quarantine" = ans_only_low
+  )
+)
+```
+
+| Scenario                    | Outbreak size % (mean) | 95% CI           |
+|:----------------------------|-----------------------:|:-----------------|
+| No Quarantine               |               86.44400 | ( 28.99, 100.00) |
+| Only High Risk Quarantine   |               68.70650 | ( 0.66, 100.00)  |
+| Only Medium Risk Quarantine |               84.38017 | ( 25.50, 100.00) |
+| Only Low Risk Quarantine    |               55.07517 | ( 1.66, 100.00)  |
+
+## Scenario: 50% vaccination, tiered quarantine
+
+For this scenario, we simulate with 50% vaccination coverage and compare
+the following tiered quarantine strategies:
+
+- Baseline: 21 days for all risk levels.
+- Strategy 1: 21 days for high risk, 14 days for medium and low risk.
+- Strategy 2: 21 days for high risk, 7 days for medium and low risk.
+- Strategy 3: 21 days for high risk, no quarantine for medium and low
+  risk.
+
+``` r
+ans_50_baseline <- simulator(
+  quarantine_days = c(21L, 21L, 21L), prop_vaccinated = 0.5
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_50_strategy1 <- simulator(
+  quarantine_days = c(21L, 14L, 14L), prop_vaccinated = 0.5
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_50_strategy2 <- simulator(
+  quarantine_days = c(21L, 7L, 7L), prop_vaccinated = 0.5
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_50_strategy3 <- simulator(
+  quarantine_days = c(21L, 0L, 0L), prop_vaccinated = 0.5
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+# Tabulating the results
+tabulator(
+  list(
+    "Baseline (21,21,21)" = ans_50_baseline,
+    "Strategy 1 (21,14,14)" =  ans_50_strategy1,
+    "Strategy 2 (21,7,7)" = ans_50_strategy2,
+    "Strategy 3 (21,0,0)" = ans_50_strategy3
+  )
+)
+```
+
+| Scenario              | Outbreak size % (mean) | 95% CI         |
+|:----------------------|-----------------------:|:---------------|
+| Baseline (21,21,21)   |               16.95100 | ( 0.17, 50.50) |
+| Strategy 1 (21,14,14) |               16.78367 | ( 0.17, 50.33) |
+| Strategy 2 (21,7,7)   |               18.52383 | ( 0.17, 50.50) |
+| Strategy 3 (21,0,0)   |               21.88667 | ( 0.17, 50.67) |
+
+## Scenario: 80% vaccination, tiered quarantine
+
+Similar to the previous scenario, we simulate with 80% vaccination
+coverage and compare the same tiered quarantine strategies:
+
+``` r
+ans_80_baseline <- simulator(
+  quarantine_days = c(21L, 21L, 21L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_strategy1 <- simulator(
+  quarantine_days = c(21L, 14L, 14L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_strategy2 <- simulator(
+  quarantine_days = c(21L, 7L, 7L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_strategy3 <- simulator(
+  quarantine_days = c(21L, 0L, 0L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+# Tabulating the results
+tabulator(
+  list(
+    "Baseline (21,21,21)" = ans_80_baseline,
+    "Strategy 1 (21,14,14)" =  ans_80_strategy1,
+    "Strategy 2 (21,7,7)" = ans_80_strategy2,
+    "Strategy 3 (21,0,0)" = ans_80_strategy3
+  )
+)
+```
+
+| Scenario              | Outbreak size % (mean) | 95% CI         |
+|:----------------------|-----------------------:|:---------------|
+| Baseline (21,21,21)   |               2.513000 | ( 0.17, 20.33) |
+| Strategy 1 (21,14,14) |               2.400167 | ( 0.17, 20.33) |
+| Strategy 2 (21,7,7)   |               2.873333 | ( 0.17, 20.50) |
+| Strategy 3 (21,0,0)   |               2.444333 | ( 0.17, 20.33) |
+
+## Scenario: 90% vaccination, tiered quarantine
+
+Finally, we simulate with 90% vaccination coverage and compare the same
+tiered quarantine strategies:
+
+``` r
+ans_90_baseline <- simulator(
+  quarantine_days = c(21L, 21L, 21L), prop_vaccinated = 0.9
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_90_strategy1 <- simulator(
+  quarantine_days = c(21L, 14L, 14L), prop_vaccinated = 0.9
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_90_strategy2 <- simulator(
+  quarantine_days = c(21L, 7L, 7L), prop_vaccinated = 0.9
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_90_strategy3 <- simulator(
+  quarantine_days = c(21L, 0L, 0L), prop_vaccinated = 0.9
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+# Tabulating the results
+tabulator(
+  list(
+    "Baseline (21,21,21)" = ans_90_baseline,
+    "Strategy 1 (21,14,14)" =  ans_90_strategy1,
+    "Strategy 2 (21,7,7)" = ans_90_strategy2,
+    "Strategy 3 (21,0,0)" = ans_90_strategy3
+  )
+)
+```
+
+| Scenario              | Outbreak size % (mean) | 95% CI        |
+|:----------------------|-----------------------:|:--------------|
+| Baseline (21,21,21)   |              0.7043333 | ( 0.17, 2.17) |
+| Strategy 1 (21,14,14) |              0.6850000 | ( 0.17, 2.17) |
+| Strategy 2 (21,7,7)   |              0.6655000 | ( 0.17, 2.33) |
+| Strategy 3 (21,0,0)   |              0.7175000 | ( 0.17, 3.17) |
+
+## Scenario: Lower quarantine duration (14 days)
+
+For this scenario, we simulate with 80% vaccination coverage and a
+maximum quarantine duration of 14 days, comparing the same tiered
+quarantine strategies:
+
+``` r
+ans_80_21_baseline <- simulator(
+  quarantine_days = c(21L, 21L, 21L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_14_strategy1 <- simulator(
+  quarantine_days = c(14L, 14L, 14L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_14_strategy2 <- simulator(
+  quarantine_days = c(14L, 10L, 10L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_14_strategy3 <- simulator(
+  quarantine_days = c(14L, 7L, 7L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+ans_80_14_strategy4 <- simulator(
+  quarantine_days = c(14L, 0L, 0L), prop_vaccinated = 0.8
+)
+```
+
+    Starting multiple runs (1000) using 10 thread(s)
+    _________________________________________________________________________
+    _________________________________________________________________________
+    ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||| done.
+
+``` r
+# Tabulating the results
+tabulator(
+  list(
+    "Baseline (21,21,21)" = ans_80_21_baseline,
+    "Strategy 1 (14,14,14)" =  ans_80_14_strategy1,
+    "Strategy 2 (14,10,10)" = ans_80_14_strategy2,
+    "Strategy 3 (14,7,7)" = ans_80_14_strategy3,
+    "Strategy 4 (14,0,0)" = ans_80_14_strategy4
+  )
+)
+```
+
+| Scenario              | Outbreak size % (mean) | 95% CI         |
+|:----------------------|-----------------------:|:---------------|
+| Baseline (21,21,21)   |               2.513000 | ( 0.17, 20.33) |
+| Strategy 1 (14,14,14) |               3.183333 | ( 0.17, 20.50) |
+| Strategy 2 (14,10,10) |               3.094500 | ( 0.17, 20.33) |
+| Strategy 3 (14,7,7)   |               3.377333 | ( 0.17, 20.50) |
+| Strategy 4 (14,0,0)   |               3.060000 | ( 0.17, 20.50) |
+
+# Final comparison
+
+Combining some of the results from different scenarios for a final
+comparison:
+
+``` r
+tabulator(
+  list(
+    "Baseline (21,21,21)"   = ans_80_21_baseline,
+    "Strategy 1 (14,14,14)" = ans_80_14_strategy1,
+    "Strategy 2 (14,10,10)" = ans_80_14_strategy2,
+    "Strategy 3 (14,7,7)"   = ans_80_14_strategy3
+  )
+)
+```
+
+| Scenario              | Outbreak size % (mean) | 95% CI         |
+|:----------------------|-----------------------:|:---------------|
+| Baseline (21,21,21)   |               2.513000 | ( 0.17, 20.33) |
+| Strategy 1 (14,14,14) |               3.183333 | ( 0.17, 20.50) |
+| Strategy 2 (14,10,10) |               3.094500 | ( 0.17, 20.33) |
+| Strategy 3 (14,7,7)   |               3.377333 | ( 0.17, 20.50) |
+
+``` r
+# We can group the four into a single plot (histogram)
+# for visual comparison
+combined_results <- rbind(
+  data.table(Scenario = "Baseline (21,21,21)", ans_80_21_baseline),
+  data.table(Scenario = "Strategy 1 (14,14,14)", ans_80_14_strategy1),
+  data.table(Scenario = "Strategy 2 (14,10,10)", ans_80_14_strategy2),
+  data.table(Scenario = "Strategy 3 (14,7,7)", ans_80_14_strategy3)
+)
+
+ggplot(combined_results, aes(x = total_infected)) +
+  geom_histogram(binwidth = 5, color = "black") +
+  facet_wrap(~ Scenario, ncol = 2) +
+  labs(
+    title = "Distribution of Total Infected Individuals - Final Comparison",
+    x = "Total Infected Individuals",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+![](README_files/figure-commonmark/unnamed-chunk-11-1.png)
