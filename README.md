@@ -19,17 +19,10 @@ George G. Vega Yon, Ph.D.
 - [Version](#version)
 
 > [!CAUTION]
-> This project is a work in progress. Use it at your own
-> risk. **This model simulates a single school, so community
-> transmission is not included**.
+> This project is a work in progress. Use it at your own risk. **This model simulates a single school, so community transmission is not included**.
 
 > [!IMPORTANT]
-> The model makes several assumptions that may not hold
-> in real-world scenarios. One important assumption is that interactions
-> between agents are based solely on class assignments, and not based on
-> friendship networks or other social structures. This assumption
-> reflects strongly in the effect of mid-risk quarantine (see below for
-> more details).
+> The model makes several assumptions that may not hold in real-world scenarios. One important assumption is that interactions between agents are based solely on class assignments, and not based on friendship networks or other social structures. This assumption reflects strongly in the effect of mid-risk quarantine (see below for more details).
 
 ## Setup
 
@@ -138,12 +131,14 @@ tabulator(
 )
 ```
 
-| Scenario                    | Outbreak size % (mean) | 95% CI           |
-|:----------------------------|:-----------------------|:-----------------|
-| No Quarantine               | 86.44                  | ( 28.99, 100.00) |
-| Only High Risk Quarantine   | 68.71                  | ( 0.66, 100.00)  |
-| Only Medium Risk Quarantine | 84.38                  | ( 25.50, 100.00) |
-| Only Low Risk Quarantine    | 55.08                  | ( 1.66, 100.00)  |
+| Scenario                    | Mean   | Median | 95% CI            |
+|:----------------------------|:-------|:-------|:------------------|
+| No Quarantine               | 518.66 | 600.00 | ( 173.95, 600.00) |
+| Only High Risk Quarantine   | 412.24 | 600.00 | ( 3.98, 600.00)   |
+| Only Medium Risk Quarantine | 506.28 | 600.00 | ( 153.00, 600.00) |
+| Only Low Risk Quarantine    | 330.45 | 568.00 | ( 9.95, 600.00)   |
+
+Outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 50% vaccination, tiered quarantine
 
@@ -173,12 +168,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Outbreak size % (mean) | 95% CI         |
-|:----------------------|:-----------------------|:---------------|
-| Baseline (21,21,21)   | 16.95                  | ( 0.17, 50.50) |
-| Strategy 1 (21,14,14) | 16.78                  | ( 0.17, 50.33) |
-| Strategy 2 (21,7,7)   | 18.52                  | ( 0.17, 50.50) |
-| Strategy 3 (21,0,0)   | 21.89                  | ( 0.17, 50.67) |
+| Scenario              | Mean   | Median | 95% CI          |
+|:----------------------|:-------|:-------|:----------------|
+| Baseline (21,21,21)   | 101.71 | 20.00  | ( 1.00, 303.00) |
+| Strategy 1 (21,14,14) | 100.70 | 20.50  | ( 1.00, 302.00) |
+| Strategy 2 (21,7,7)   | 111.14 | 33.00  | ( 1.00, 303.00) |
+| Strategy 3 (21,0,0)   | 131.32 | 93.00  | ( 1.00, 304.00) |
+
+Outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 80% vaccination, tiered quarantine
 
@@ -202,12 +199,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Outbreak size % (mean) | 95% CI         |
-|:----------------------|:-----------------------|:---------------|
-| Baseline (21,21,21)   | 2.51                   | ( 0.17, 20.33) |
-| Strategy 1 (21,14,14) | 2.40                   | ( 0.17, 20.33) |
-| Strategy 2 (21,7,7)   | 2.87                   | ( 0.17, 20.50) |
-| Strategy 3 (21,0,0)   | 2.44                   | ( 0.17, 20.33) |
+| Scenario              | Mean  | Median | 95% CI          |
+|:----------------------|:------|:-------|:----------------|
+| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
+| Strategy 1 (21,14,14) | 14.40 | 5.00   | ( 1.00, 122.00) |
+| Strategy 2 (21,7,7)   | 17.24 | 5.00   | ( 1.00, 123.00) |
+| Strategy 3 (21,0,0)   | 14.67 | 6.00   | ( 1.00, 122.00) |
+
+Outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 90% vaccination, tiered quarantine
 
@@ -231,12 +230,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Outbreak size % (mean) | 95% CI        |
-|:----------------------|:-----------------------|:--------------|
-| Baseline (21,21,21)   | 0.70                   | ( 0.17, 2.17) |
-| Strategy 1 (21,14,14) | 0.69                   | ( 0.17, 2.17) |
-| Strategy 2 (21,7,7)   | 0.67                   | ( 0.17, 2.33) |
-| Strategy 3 (21,0,0)   | 0.72                   | ( 0.17, 3.17) |
+| Scenario              | Mean | Median | 95% CI         |
+|:----------------------|:-----|:-------|:---------------|
+| Baseline (21,21,21)   | 4.23 | 2.00   | ( 1.00, 13.00) |
+| Strategy 1 (21,14,14) | 4.11 | 2.00   | ( 1.00, 13.00) |
+| Strategy 2 (21,7,7)   | 3.99 | 2.00   | ( 1.00, 14.00) |
+| Strategy 3 (21,0,0)   | 4.30 | 2.00   | ( 1.00, 19.02) |
+
+Outbreak sizes across different quarantine scenarios.
 
 ### Scenario: Lower quarantine duration (14 days)
 
@@ -263,13 +264,15 @@ tabulator(
 )
 ```
 
-| Scenario              | Outbreak size % (mean) | 95% CI         |
-|:----------------------|:-----------------------|:---------------|
-| Baseline (21,21,21)   | 2.51                   | ( 0.17, 20.33) |
-| Strategy 1 (14,14,14) | 3.18                   | ( 0.17, 20.50) |
-| Strategy 2 (14,10,10) | 3.09                   | ( 0.17, 20.33) |
-| Strategy 3 (14,7,7)   | 3.38                   | ( 0.17, 20.50) |
-| Strategy 4 (14,0,0)   | 3.06                   | ( 0.17, 20.50) |
+| Scenario              | Mean  | Median | 95% CI          |
+|:----------------------|:------|:-------|:----------------|
+| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
+| Strategy 1 (14,14,14) | 19.10 | 5.50   | ( 1.00, 123.00) |
+| Strategy 2 (14,10,10) | 18.57 | 6.00   | ( 1.00, 122.00) |
+| Strategy 3 (14,7,7)   | 20.26 | 6.00   | ( 1.00, 123.00) |
+| Strategy 4 (14,0,0)   | 18.36 | 7.00   | ( 1.00, 123.00) |
+
+Outbreak sizes across different quarantine scenarios.
 
 ## Overall comparison
 
@@ -288,12 +291,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Outbreak size % (mean) | 95% CI         |
-|:----------------------|:-----------------------|:---------------|
-| Baseline (21,21,21)   | 2.51                   | ( 0.17, 20.33) |
-| Strategy 1 (14,14,14) | 3.18                   | ( 0.17, 20.50) |
-| Strategy 2 (14,10,10) | 3.09                   | ( 0.17, 20.33) |
-| Strategy 3 (14,7,7)   | 3.38                   | ( 0.17, 20.50) |
+| Scenario              | Mean  | Median | 95% CI          |
+|:----------------------|:------|:-------|:----------------|
+| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
+| Strategy 1 (14,14,14) | 19.10 | 5.50   | ( 1.00, 123.00) |
+| Strategy 2 (14,10,10) | 18.57 | 6.00   | ( 1.00, 122.00) |
+| Strategy 3 (14,7,7)   | 20.26 | 6.00   | ( 1.00, 123.00) |
+
+Outbreak sizes across different quarantine scenarios.
 
 ``` r
 # We can group the four into a single plot (histogram)

@@ -66,22 +66,29 @@ tabulator <- function(ans) {
   scenario_names <- names(ans)
     data.table(
       Scenario = scenario_names,
-      `Outbreak size % (mean)` = sapply(
+      `Mean` = sapply(
         scenario_names,
         function(x) sprintf(
           "%.2f",
-          mean(ans[[x]]$total_infected) / n_agents * 100
+          mean(ans[[x]]$total_infected)
         )
       ) ,
+      `Median` = sapply(
+        scenario_names,
+        function(x) sprintf(
+          "%.2f",
+          median(ans[[x]]$total_infected)
+        )
+      ),
       `95% CI` = sapply(
         scenario_names,
         function(x) {
           ci <- quantile(
-            ans[[x]]$total_infected / n_agents * 100,
+            ans[[x]]$total_infected,
             probs = c(0.025, 0.975)
           )
           sprintf("(% 5.2f, % 5.2f)", ci[1], ci[2])
         }
       )
-    ) |> knitr::kable()
+    ) |> knitr::kable(caption = "Outbreak sizes across different quarantine scenarios.")
 }
