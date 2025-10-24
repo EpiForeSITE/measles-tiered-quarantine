@@ -18,11 +18,13 @@ George G. Vega Yon, Ph.D.
 - [Discussion](#discussion)
 - [Version](#version)
 
-> \[!CAUTION\] This project is a work in progress. Use it at your own
+> [!CAUTION]
+> This project is a work in progress. Use it at your own
 > risk. **This model simulates a single school, so community
 > transmission is not included**.
 
-> \[!IMPORTANT\] The model makes several assumptions that may not hold
+> [!IMPORTANT]
+> The model makes several assumptions that may not hold
 > in real-world scenarios. One important assumption is that interactions
 > between agents are based solely on class assignments, and not based on
 > friendship networks or other social structures. This assumption
