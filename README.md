@@ -2,6 +2,7 @@
 George G. Vega Yon, Ph.D.
 2025-10-23
 
+- [Description of the model](#description-of-the-model)
 - [Setup](#setup)
 - [Scenarios](#scenarios)
   - [Scenario: No vaccination, only one risk level
@@ -18,11 +19,34 @@ George G. Vega Yon, Ph.D.
 - [Discussion](#discussion)
 - [Version](#version)
 
+[![](https://github.com/EpiForeSITE/software/raw/e82ed88f75e0fe5c0a1a3b38c2b94509f122019c/docs/assets/foresite-software-badge.svg)](https://github.com/EpiForeSITE/software)
+
 > [!CAUTION]
 > This project is a work in progress. Use it at your own risk. **This model simulates a single school, so community transmission is not included**.
 
 > [!IMPORTANT]
 > The model makes several assumptions that may not hold in real-world scenarios. One important assumption is that interactions between agents are based solely on class assignments, and not based on friendship networks or other social structures. This assumption reflects strongly in the effect of mid-risk quarantine (see below for more details).
+
+## Description of the model
+
+We are using the `ModelMeaslesMixingRiskQuarantine()` model from the
+`epiworldR` package (version 0.10.0.0 or higher). This model uses a
+mixing matrix to represent how agents’ interactions are distributed. In
+this case, groups represent classrooms in a school, so kids will have
+more interactions with kids in their own class than with kids from other
+classes.
+
+The model contains the full disease progression for measles, including
+the incubation period, prodromal phase, and rash phase. The model
+assumes that kids in the rash phase are isolated from their peers.
+Nonetheless, the model is calibrated to reflect the measles
+$\mathcal{R}_0$ of 15, so kids are infectious during the prodromal
+period. Agents can also become hospitalized.
+
+The quarantine process is triggered when an agent is detected during the
+rash period. This could occur for more than one agent in the same step.
+Quarantine process only applies to unvaccinated agents, and the duration
+of quarantine depends on the risk level of the agent, as defined below.
 
 ## Setup
 
@@ -300,6 +324,12 @@ tabulator(
 
 Outbreak sizes across different quarantine scenarios.
 
+The table may be somewhat misleading since it is suggesting that
+strategy 2 (which is fewer days of quarantine than strategy 1) is
+performing better. However, looking into the distribution of total
+infected individuals provides a better picture of the differences
+between strategies:
+
 ``` r
 # We can group the four into a single plot (histogram)
 # for visual comparison
@@ -321,7 +351,11 @@ combined_results[total_infected < 50] |>
     theme_minimal()
 ```
 
-![](README_files/figure-commonmark/overall-comparison-1.png)
+![](README_files/figure-commonmark/overall-comparison-plot-1.png)
+
+Looking at the density plot, we can see that the ordering of the
+distribution in outbreak sizes is consistent with the expected impact of
+the different quarantine strategies.
 
 # Discussion
 
