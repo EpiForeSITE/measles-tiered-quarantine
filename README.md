@@ -402,3 +402,4 @@ high-risk quarantine until more detailed models are developed.
 This analysis was performed using `epiworldR` version 0.10.0.0, with R
 version R version 4.5.1 (2025-06-13). You can get the latest version of
 `epiworldR` from GitHub at <https://github.com/UofUEpiBio/epiworldR>.
+
