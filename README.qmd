@@ -92,6 +92,14 @@ We will test the model using the following scenarios:
 - 50%, 80%, and 95% vaccination coverage.
 - Quarantine days set to 0, 7, 14, and 21 days.
 
+To assess the risk effect between different quarantine strategies, we report the probability of observing outbreaks of various sizes rather than means and medians. Specifically, we calculate:
+
+- **P(≥10)**: Probability that an outbreak reaches 10 or more infected individuals
+- **P(≥20)**: Probability that an outbreak reaches 20 or more infected individuals  
+- **P(≥50)**: Probability that an outbreak reaches 50 or more infected individuals
+
+This approach provides a clearer picture of the distribution's tail behavior and allows for better comparison of risk across different strategies.
+
 ## Scenarios
 
 ### Scenario: No vaccination, only one risk level quarantined
@@ -226,7 +234,7 @@ tabulator(
 )
 ```
 
-The table may be somewhat misleading since it is suggesting that strategy 2 (which is fewer days of quarantine than strategy 1) is performing better. However, looking into the distribution of total infected individuals provides a better picture of the differences between strategies:
+The probability-based metrics provide a clearer picture of outbreak risk across different strategies. By examining the probability of reaching specific outbreak thresholds (10, 20, and 50 infected individuals), we can better assess the practical implications of each quarantine strategy. The distribution of total infected individuals can be further explored through density plots:
 
 ```{r}
 #| label: overall-comparison-plot

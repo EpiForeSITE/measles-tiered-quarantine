@@ -61,34 +61,31 @@ simulator <- function(
 #' Summarizes the simulation results into a table.
 #' @param ans A list of simulation results.
 #' @return
-#' A formatted table summarizing the outbreak sizes and confidence intervals.
+#' A formatted table summarizing the probability of outbreaks of various sizes.
 tabulator <- function(ans) {
   scenario_names <- names(ans)
     data.table(
       Scenario = scenario_names,
-      `Mean` = sapply(
+      `P(≥10)` = sapply(
         scenario_names,
         function(x) sprintf(
-          "%.2f",
-          mean(ans[[x]]$total_infected)
-        )
-      ) ,
-      `Median` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.2f",
-          median(ans[[x]]$total_infected)
+          "%.3f",
+          mean(ans[[x]]$total_infected >= 10)
         )
       ),
-      `95% CI` = sapply(
+      `P(≥20)` = sapply(
         scenario_names,
-        function(x) {
-          ci <- quantile(
-            ans[[x]]$total_infected,
-            probs = c(0.025, 0.975)
-          )
-          sprintf("(% 5.2f, % 5.2f)", ci[1], ci[2])
-        }
+        function(x) sprintf(
+          "%.3f",
+          mean(ans[[x]]$total_infected >= 20)
+        )
+      ),
+      `P(≥50)` = sapply(
+        scenario_names,
+        function(x) sprintf(
+          "%.3f",
+          mean(ans[[x]]$total_infected >= 50)
+        )
       )
-    ) |> knitr::kable(caption = "Outbreak sizes across different quarantine scenarios.")
+    ) |> knitr::kable(caption = "Probability of outbreak sizes across different quarantine scenarios.")
 }
