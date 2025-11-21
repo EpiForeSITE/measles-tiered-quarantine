@@ -95,7 +95,7 @@ We will test the model using the following scenarios:
 To assess the risk effect between different quarantine strategies, we report the probability of observing outbreaks of various sizes rather than means and medians. Specifically, we calculate:
 
 - **P(≥10)**: Probability that an outbreak reaches 10 or more infected individuals
-- **P(≥20)**: Probability that an outbreak reaches 20 or more infected individuals  
+- **P(≥20)**: Probability that an outbreak reaches 20 or more infected individuals
 - **P(≥50)**: Probability that an outbreak reaches 50 or more infected individuals
 
 This approach provides a clearer picture of the distribution's tail behavior and allows for better comparison of risk across different strategies.
