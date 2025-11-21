@@ -60,32 +60,26 @@ simulator <- function(
 
 #' Summarizes the simulation results into a table.
 #' @param ans A list of simulation results.
+#' @param sizes A numeric vector of outbreak size thresholds to compute probabilities for. Default is c(10, 20, 50).
 #' @return
 #' A formatted table summarizing the probability of outbreaks of various sizes.
-tabulator <- function(ans) {
+tabulator <- function(ans, sizes = c(10, 20, 50)) {
   scenario_names <- names(ans)
-    data.table(
-      Scenario = scenario_names,
-      `P(≥10)` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.3f",
-          mean(ans[[x]]$total_infected >= 10)
-        )
-      ),
-      `P(≥20)` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.3f",
-          mean(ans[[x]]$total_infected >= 20)
-        )
-      ),
-      `P(≥50)` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.3f",
-          mean(ans[[x]]$total_infected >= 50)
-        )
+  
+  # Create the base data.table with scenario names
+  result <- data.table(Scenario = scenario_names)
+  
+  # Add a column for each size threshold
+  for (size in sizes) {
+    col_name <- paste0("P(≥", size, ")")
+    result[[col_name]] <- sapply(
+      scenario_names,
+      function(x) sprintf(
+        "%.3f",
+        mean(ans[[x]]$total_infected >= size)
       )
-    ) |> knitr::kable(caption = "Probability of outbreak sizes across different quarantine scenarios.")
+    )
+  }
+  
+  result |> knitr::kable(caption = "Probability of outbreak sizes across different quarantine scenarios.")
 }
