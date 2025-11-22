@@ -64,6 +64,9 @@ simulator <- function(
 #' @return
 #' A formatted table summarizing the probability of outbreaks of various sizes.
 tabulator <- function(ans, sizes = c(10, 20, 50)) {
+  if (length(sizes) == 0 || !is.numeric(sizes) || any(sizes <= 0)) {
+    stop("'sizes' must be a non-empty numeric vector with positive values")
+  }
   if (is.null(ans) || length(ans) == 0 || is.null(names(ans))) {
     stop("'ans' must be a non-empty named list of simulation results")
   }
