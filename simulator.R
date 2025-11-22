@@ -72,6 +72,13 @@ tabulator <- function(ans, sizes = c(10, 20, 50)) {
   }
   scenario_names <- names(ans)
   
+  # Validate that each scenario has the required 'total_infected' column
+  for (name in scenario_names) {
+    if (is.null(ans[[name]]$total_infected)) {
+      stop(sprintf("Scenario '%s' is missing the 'total_infected' column", name))
+    }
+  }
+  
   # Create the base data.table with scenario names
   result <- data.table(Scenario = scenario_names)
   
