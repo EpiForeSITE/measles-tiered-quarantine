@@ -60,35 +60,39 @@ simulator <- function(
 
 #' Summarizes the simulation results into a table.
 #' @param ans A list of simulation results.
+#' @param sizes A numeric vector of outbreak size thresholds to compute probabilities for. Default is c(10, 20, 50).
 #' @return
-#' A formatted table summarizing the outbreak sizes and confidence intervals.
-tabulator <- function(ans) {
+#' A formatted table summarizing the probability of outbreaks of various sizes.
+tabulator <- function(ans, sizes = c(10, 20, 50)) {
+  if (length(sizes) == 0 || !is.numeric(sizes) || any(sizes <= 0)) {
+    stop("'sizes' must be a non-empty numeric vector with positive values")
+  }
+  if (is.null(ans) || length(ans) == 0 || is.null(names(ans))) {
+    stop("'ans' must be a non-empty named list of simulation results")
+  }
   scenario_names <- names(ans)
-    data.table(
-      Scenario = scenario_names,
-      `Mean` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.2f",
-          mean(ans[[x]]$total_infected)
-        )
-      ) ,
-      `Median` = sapply(
-        scenario_names,
-        function(x) sprintf(
-          "%.2f",
-          median(ans[[x]]$total_infected)
-        )
-      ),
-      `95% CI` = sapply(
-        scenario_names,
-        function(x) {
-          ci <- quantile(
-            ans[[x]]$total_infected,
-            probs = c(0.025, 0.975)
-          )
-          sprintf("(% 5.2f, % 5.2f)", ci[1], ci[2])
-        }
+  
+  # Validate that each scenario has the required 'total_infected' column
+  for (name in scenario_names) {
+    if (is.null(ans[[name]]$total_infected)) {
+      stop(sprintf("Scenario '%s' is missing the 'total_infected' column", name))
+    }
+  }
+  
+  # Create the base data.table with scenario names
+  result <- data.table(Scenario = scenario_names)
+  
+  # Add a column for each size threshold
+  for (size in sizes) {
+    col_name <- paste0("P(≥", size, ")")
+    result[[col_name]] <- sapply(
+      scenario_names,
+      function(x) sprintf(
+        "%.3f",
+        mean(ans[[x]]$total_infected >= size)
       )
-    ) |> knitr::kable(caption = "Outbreak sizes across different quarantine scenarios.")
+    )
+  }
+  
+  result |> knitr::kable(caption = "Probability of outbreak sizes across different quarantine scenarios.")
 }

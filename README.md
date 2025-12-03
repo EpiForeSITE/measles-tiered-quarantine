@@ -92,7 +92,7 @@ library(ggplot2)
 source("simulator.R")
 
 # Simulation parameters
-n_sims    <- 1000
+n_sims    <- 2000
 n_agents  <- 600
 n_classes <- 20
 n_agents_per_class <- n_agents / n_classes
@@ -134,6 +134,21 @@ We will test the model using the following scenarios:
 - 50%, 80%, and 95% vaccination coverage.
 - Quarantine days set to 0, 7, 14, and 21 days.
 
+To assess the risk effect between different quarantine strategies, we
+report the probability of observing outbreaks of various sizes rather
+than means and medians. Specifically, we calculate:
+
+- **P(≥10)**: Probability that an outbreak reaches 10 or more infected
+  individuals
+- **P(≥20)**: Probability that an outbreak reaches 20 or more infected
+  individuals
+- **P(≥50)**: Probability that an outbreak reaches 50 or more infected
+  individuals
+
+This approach provides a clearer picture of the distribution’s tail
+behavior and allows for better comparison of risk across different
+strategies.
+
 ## Scenarios
 
 ### Scenario: No vaccination, only one risk level quarantined
@@ -155,14 +170,14 @@ tabulator(
 )
 ```
 
-| Scenario                    | Mean   | Median | 95% CI            |
-|:----------------------------|:-------|:-------|:------------------|
-| No Quarantine               | 518.66 | 600.00 | ( 173.95, 600.00) |
-| Only High Risk Quarantine   | 412.24 | 600.00 | ( 3.98, 600.00)   |
-| Only Medium Risk Quarantine | 506.28 | 600.00 | ( 153.00, 600.00) |
-| Only Low Risk Quarantine    | 330.45 | 568.00 | ( 9.95, 600.00)   |
+| Scenario                    | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------------|:-------|:-------|:-------|
+| No Quarantine               | 0.991  | 0.991  | 0.991  |
+| Only High Risk Quarantine   | 0.928  | 0.919  | 0.910  |
+| Only Medium Risk Quarantine | 0.987  | 0.987  | 0.987  |
+| Only Low Risk Quarantine    | 0.977  | 0.960  | 0.632  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 50% vaccination, tiered quarantine
 
@@ -192,14 +207,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Mean   | Median | 95% CI          |
-|:----------------------|:-------|:-------|:----------------|
-| Baseline (21,21,21)   | 101.71 | 20.00  | ( 1.00, 303.00) |
-| Strategy 1 (21,14,14) | 100.70 | 20.50  | ( 1.00, 302.00) |
-| Strategy 2 (21,7,7)   | 111.14 | 33.00  | ( 1.00, 303.00) |
-| Strategy 3 (21,0,0)   | 131.32 | 93.00  | ( 1.00, 304.00) |
+| Scenario              | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------|:-------|:-------|:-------|
+| Baseline (21,21,21)   | 0.686  | 0.513  | 0.313  |
+| Strategy 1 (21,14,14) | 0.705  | 0.506  | 0.311  |
+| Strategy 2 (21,7,7)   | 0.746  | 0.633  | 0.425  |
+| Strategy 3 (21,0,0)   | 0.800  | 0.751  | 0.674  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 80% vaccination, tiered quarantine
 
@@ -223,14 +238,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Mean  | Median | 95% CI          |
-|:----------------------|:------|:-------|:----------------|
-| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
-| Strategy 1 (21,14,14) | 14.40 | 5.00   | ( 1.00, 122.00) |
-| Strategy 2 (21,7,7)   | 17.24 | 5.00   | ( 1.00, 123.00) |
-| Strategy 3 (21,0,0)   | 14.67 | 6.00   | ( 1.00, 122.00) |
+| Scenario              | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------|:-------|:-------|:-------|
+| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
+| Strategy 1 (21,14,14) | 0.258  | 0.103  | 0.081  |
+| Strategy 2 (21,7,7)   | 0.308  | 0.142  | 0.089  |
+| Strategy 3 (21,0,0)   | 0.385  | 0.228  | 0.054  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
 ### Scenario: 90% vaccination, tiered quarantine
 
@@ -254,14 +269,14 @@ tabulator(
 )
 ```
 
-| Scenario              | Mean | Median | 95% CI         |
-|:----------------------|:-----|:-------|:---------------|
-| Baseline (21,21,21)   | 4.23 | 2.00   | ( 1.00, 13.00) |
-| Strategy 1 (21,14,14) | 4.11 | 2.00   | ( 1.00, 13.00) |
-| Strategy 2 (21,7,7)   | 3.99 | 2.00   | ( 1.00, 14.00) |
-| Strategy 3 (21,0,0)   | 4.30 | 2.00   | ( 1.00, 19.02) |
+| Scenario              | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------|:-------|:-------|:-------|
+| Baseline (21,21,21)   | 0.051  | 0.032  | 0.032  |
+| Strategy 1 (21,14,14) | 0.059  | 0.026  | 0.026  |
+| Strategy 2 (21,7,7)   | 0.067  | 0.023  | 0.021  |
+| Strategy 3 (21,0,0)   | 0.089  | 0.018  | 0.008  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
 ### Scenario: Lower quarantine duration (14 days)
 
@@ -288,15 +303,15 @@ tabulator(
 )
 ```
 
-| Scenario              | Mean  | Median | 95% CI          |
-|:----------------------|:------|:-------|:----------------|
-| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
-| Strategy 1 (14,14,14) | 19.10 | 5.50   | ( 1.00, 123.00) |
-| Strategy 2 (14,10,10) | 18.57 | 6.00   | ( 1.00, 122.00) |
-| Strategy 3 (14,7,7)   | 20.26 | 6.00   | ( 1.00, 123.00) |
-| Strategy 4 (14,0,0)   | 18.36 | 7.00   | ( 1.00, 123.00) |
+| Scenario              | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------|:-------|:-------|:-------|
+| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
+| Strategy 1 (14,14,14) | 0.304  | 0.137  | 0.108  |
+| Strategy 2 (14,10,10) | 0.336  | 0.146  | 0.100  |
+| Strategy 3 (14,7,7)   | 0.360  | 0.177  | 0.108  |
+| Strategy 4 (14,0,0)   | 0.449  | 0.290  | 0.079  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
 ## Overall comparison
 
@@ -315,20 +330,21 @@ tabulator(
 )
 ```
 
-| Scenario              | Mean  | Median | 95% CI          |
-|:----------------------|:------|:-------|:----------------|
-| Baseline (21,21,21)   | 15.08 | 5.00   | ( 1.00, 122.00) |
-| Strategy 1 (14,14,14) | 19.10 | 5.50   | ( 1.00, 123.00) |
-| Strategy 2 (14,10,10) | 18.57 | 6.00   | ( 1.00, 122.00) |
-| Strategy 3 (14,7,7)   | 20.26 | 6.00   | ( 1.00, 123.00) |
+| Scenario              | P(≥10) | P(≥20) | P(≥50) |
+|:----------------------|:-------|:-------|:-------|
+| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
+| Strategy 1 (14,14,14) | 0.304  | 0.137  | 0.108  |
+| Strategy 2 (14,10,10) | 0.336  | 0.146  | 0.100  |
+| Strategy 3 (14,7,7)   | 0.360  | 0.177  | 0.108  |
 
-Outbreak sizes across different quarantine scenarios.
+Probability of outbreak sizes across different quarantine scenarios.
 
-The table may be somewhat misleading since it is suggesting that
-strategy 2 (which is fewer days of quarantine than strategy 1) is
-performing better. However, looking into the distribution of total
-infected individuals provides a better picture of the differences
-between strategies:
+The probability-based metrics provide a clearer picture of outbreak risk
+across different strategies. By examining the probability of reaching
+specific outbreak thresholds (10, 20, and 50 infected individuals), we
+can better assess the practical implications of each quarantine
+strategy. The distribution of total infected individuals can be further
+explored through density plots:
 
 ``` r
 # We can group the four into a single plot (histogram)
