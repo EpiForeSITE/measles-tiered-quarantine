@@ -16,6 +16,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y valgrind gdb \
 
 RUN apt-get update && apt-get install --no-install-recommends -y pre-commit nano
 
-RUN Rscript --vanilla -e 'install.packages("epiworldR", repos = c("https://uofuepibio.r-universe.dev", "https://cloud.r-project.org"))'
+RUN installGithub.r UofUEpiBio/measles@gvegayon/binomial_params
 
 CMD ["bash"]

@@ -79,8 +79,10 @@ including sourcing the simulator function in the file
 [`simulator.R`](./simulator.R):
 
 ``` r
-library(epiworldR)
+library(measles)
 ```
+
+    Loading required package: epiworldR
 
     Thank you for using epiworldR! Please consider citing it in your work.
     You can find the citation information by running
@@ -172,10 +174,10 @@ tabulator(
 
 | Scenario                    | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------------|:-------|:-------|:-------|
-| No Quarantine               | 0.991  | 0.991  | 0.991  |
-| Only High Risk Quarantine   | 0.928  | 0.919  | 0.910  |
-| Only Medium Risk Quarantine | 0.987  | 0.987  | 0.987  |
-| Only Low Risk Quarantine    | 0.977  | 0.960  | 0.632  |
+| No Quarantine               | 0.995  | 0.995  | 0.995  |
+| Only High Risk Quarantine   | 0.935  | 0.923  | 0.912  |
+| Only Medium Risk Quarantine | 0.992  | 0.992  | 0.992  |
+| Only Low Risk Quarantine    | 0.983  | 0.975  | 0.638  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -209,10 +211,10 @@ tabulator(
 
 | Scenario              | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------|:-------|:-------|:-------|
-| Baseline (21,21,21)   | 0.686  | 0.513  | 0.313  |
-| Strategy 1 (21,14,14) | 0.705  | 0.506  | 0.311  |
-| Strategy 2 (21,7,7)   | 0.746  | 0.633  | 0.425  |
-| Strategy 3 (21,0,0)   | 0.800  | 0.751  | 0.674  |
+| Baseline (21,21,21)   | 0.704  | 0.505  | 0.303  |
+| Strategy 1 (21,14,14) | 0.721  | 0.521  | 0.311  |
+| Strategy 2 (21,7,7)   | 0.762  | 0.634  | 0.415  |
+| Strategy 3 (21,0,0)   | 0.806  | 0.763  | 0.693  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -240,10 +242,10 @@ tabulator(
 
 | Scenario              | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------|:-------|:-------|:-------|
-| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
-| Strategy 1 (21,14,14) | 0.258  | 0.103  | 0.081  |
-| Strategy 2 (21,7,7)   | 0.308  | 0.142  | 0.089  |
-| Strategy 3 (21,0,0)   | 0.385  | 0.228  | 0.054  |
+| Baseline (21,21,21)   | 0.230  | 0.105  | 0.092  |
+| Strategy 1 (21,14,14) | 0.245  | 0.105  | 0.080  |
+| Strategy 2 (21,7,7)   | 0.307  | 0.148  | 0.092  |
+| Strategy 3 (21,0,0)   | 0.396  | 0.239  | 0.062  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -271,10 +273,10 @@ tabulator(
 
 | Scenario              | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------|:-------|:-------|:-------|
-| Baseline (21,21,21)   | 0.051  | 0.032  | 0.032  |
-| Strategy 1 (21,14,14) | 0.059  | 0.026  | 0.026  |
-| Strategy 2 (21,7,7)   | 0.067  | 0.023  | 0.021  |
-| Strategy 3 (21,0,0)   | 0.089  | 0.018  | 0.008  |
+| Baseline (21,21,21)   | 0.062  | 0.036  | 0.036  |
+| Strategy 1 (21,14,14) | 0.068  | 0.032  | 0.032  |
+| Strategy 2 (21,7,7)   | 0.083  | 0.029  | 0.024  |
+| Strategy 3 (21,0,0)   | 0.104  | 0.022  | 0.006  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -305,11 +307,11 @@ tabulator(
 
 | Scenario              | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------|:-------|:-------|:-------|
-| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
-| Strategy 1 (14,14,14) | 0.304  | 0.137  | 0.108  |
-| Strategy 2 (14,10,10) | 0.336  | 0.146  | 0.100  |
-| Strategy 3 (14,7,7)   | 0.360  | 0.177  | 0.108  |
-| Strategy 4 (14,0,0)   | 0.449  | 0.290  | 0.079  |
+| Baseline (21,21,21)   | 0.230  | 0.105  | 0.092  |
+| Strategy 1 (14,14,14) | 0.311  | 0.142  | 0.104  |
+| Strategy 2 (14,10,10) | 0.331  | 0.149  | 0.105  |
+| Strategy 3 (14,7,7)   | 0.365  | 0.171  | 0.103  |
+| Strategy 4 (14,0,0)   | 0.454  | 0.306  | 0.085  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -332,10 +334,10 @@ tabulator(
 
 | Scenario              | P(≥10) | P(≥20) | P(≥50) |
 |:----------------------|:-------|:-------|:-------|
-| Baseline (21,21,21)   | 0.239  | 0.106  | 0.092  |
-| Strategy 1 (14,14,14) | 0.304  | 0.137  | 0.108  |
-| Strategy 2 (14,10,10) | 0.336  | 0.146  | 0.100  |
-| Strategy 3 (14,7,7)   | 0.360  | 0.177  | 0.108  |
+| Baseline (21,21,21)   | 0.230  | 0.105  | 0.092  |
+| Strategy 1 (14,14,14) | 0.311  | 0.142  | 0.104  |
+| Strategy 2 (14,10,10) | 0.331  | 0.149  | 0.105  |
+| Strategy 3 (14,7,7)   | 0.365  | 0.171  | 0.103  |
 
 Probability of outbreak sizes across different quarantine scenarios.
 
@@ -396,6 +398,9 @@ high-risk quarantine until more detailed models are developed.
 
 # Version
 
-This analysis was performed using `epiworldR` version 0.10.0.0, with R
-version R version 4.5.1 (2025-06-13). You can get the latest version of
-`epiworldR` from GitHub at <https://github.com/UofUEpiBio/epiworldR>.
+This analysis was performed using `epiworldR` version 0.11.2.0, with R
+version R version 4.5.1 (2025-06-13), and the `measles` R package
+version 0.1.0. You can get the latest version of `epiworldR` and the
+`measles` R packagefrom GitHub at
+<https://github.com/UofUEpiBio/epiworldR> and
+<https://github.com/UofUEpiBio/measles>.
