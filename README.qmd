@@ -268,4 +268,4 @@ The mid-risk quarantine strategy--which applies to agents who are not in the sam
 
 # Version
 
-This analysis was performed using `epiworldR` version `r as.character(packageVersion("epiworldR"))`, with R version `r R.version.string`, and the `measles` R package version `r as.character(packageVersion("measles"))`. You can get the latest version of `epiworldR` and the `measles` R packagefrom GitHub at <https://github.com/UofUEpiBio/epiworldR> and <https://github.com/UofUEpiBio/measles>.
+This analysis was performed using `epiworldR` version `r as.character(packageVersion("epiworldR"))`, with R version `r R.version.string`, and the `measles` R package version `r as.character(packageVersion("measles"))`. You can get the latest version of `epiworldR` and the `measles` R package from GitHub at <https://github.com/UofUEpiBio/epiworldR> and <https://github.com/UofUEpiBio/measles>.

@@ -399,8 +399,8 @@ high-risk quarantine until more detailed models are developed.
 # Version
 
 This analysis was performed using `epiworldR` version 0.11.2.0, with R
-version R version 4.5.1 (2025-06-13), and the `measles` R package
+version 4.5.1 (2025-06-13), and the `measles` R package
 version 0.1.0. You can get the latest version of `epiworldR` and the
-`measles` R packagefrom GitHub at
+`measles` R package from GitHub at
 <https://github.com/UofUEpiBio/epiworldR> and
 <https://github.com/UofUEpiBio/measles>.
