@@ -1,10 +1,5 @@
-# Measles Tiered Quarantine Simulation – 50% Vaccination
+# Measles Tiered Quarantine Simulations
 George G. Vega Yon, Ph.D.
-2025-10-23
-
-- [Description of the model](#description-of-the-model)
-- [Setup](#setup)
-- [Results](#results)
 
 [![](https://github.com/EpiForeSITE/software/raw/e82ed88f75e0fe5c0a1a3b38c2b94509f122019c/docs/assets/foresite-software-badge.svg)](https://github.com/EpiForeSITE/software)
 
@@ -70,3 +65,12 @@ You can see the individual results of each scenario under the folder
 - [Scenario with 80% vaccination](scenarios/scenario-vax-0.80.md)
 - [Scenario with 90% vaccination](scenarios/scenario-vax-0.90.md)
 - [Scenario with 95% vaccination](scenarios/scenario-vax-0.95.md)
+
+# Version
+
+This analysis was performed using `epiworldR` version 0.11.2.0, with R
+version R version 4.5.1 (2025-06-13), and the `measles` R package
+version 0.1.0. You can get the latest version of `epiworldR` and the
+`measles` R package from GitHub at
+<https://github.com/UofUEpiBio/epiworldR> and
+<https://github.com/UofUEpiBio/measles>.

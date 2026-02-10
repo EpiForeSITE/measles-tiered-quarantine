@@ -1,22 +1,13 @@
 ---
 format: gfm
-title: Measles Tiered Quarantine Simulation -- `r sprintf("%.0f", params$vax_rate * 100)`% Vaccination
+title: Measles Tiered Quarantine Simulations
 author: George G. Vega Yon, Ph.D.
-date: 2025-10-23
-toc: true
-toc-location: body
-params:
-  vax_rate: 0.5
 ---
 
 ```{r}
 #| label: setup
 #| echo: false
 knitr::opts_chunk$set(echo = FALSE)
-
-if (!exists("params")) {
-  params <- list(vax_rate = 0.5)
-}
 ```
 
 ```{=markdown}
@@ -72,3 +63,7 @@ sprintf(
 cat("\n")
 ```
 
+
+# Version
+
+This analysis was performed using `epiworldR` version `r as.character(packageVersion("epiworldR"))`, with R version `r R.version.string`, and the `measles` R package version `r as.character(packageVersion("measles"))`. You can get the latest version of `epiworldR` and the `measles` R package from GitHub at <https://github.com/UofUEpiBio/epiworldR> and <https://github.com/UofUEpiBio/measles>.
