@@ -1,0 +1,5 @@
+*.rds
+*.rda
+*.pdf
+*.Rout
+.vscode
