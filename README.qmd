@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 ## Description of the model
 
-We are using the `ModelMeaslesMixingRiskQuarantine()` model from the `epiworldR` package (version 0.10.0.0 or higher). This model uses a mixing matrix to represent how agents' interactions are distributed. In this case, groups represent classrooms in a school, so kids will have more interactions with kids in their own class than with kids from other classes.
+We are using the `ModelMeaslesMixingRiskQuarantine()` model from the `epiworldR` package (version 0.12.0.0 or later). This model uses a mixing matrix to represent how agents' interactions are distributed. In this case, groups represent classrooms in a school, so kids will have more interactions with kids in their own class than with kids from other classes.
 
 The model contains the full disease progression for measles, including the incubation period, prodromal phase, and rash phase. The model assumes that kids in the rash phase are isolated from their peers. Nonetheless, the model is calibrated to reflect the measles $\mathcal{R}_0$ of 15, so kids are infectious during the prodromal period. Agents can also become hospitalized.
 
@@ -61,6 +61,90 @@ sprintf(
   paste(collapse = "\n") |>
   cat()
 cat("\n")
+```
+
+The overall results can be seen here:
+
+```{r}
+#| label: results
+#| echo: false
+#| warning: false
+#| message: false
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+fns <- list.files("scenarios", pattern = "[.]rds", full.names = TRUE)
+results <- lapply(fns, \(fn) {
+  x <- readRDS(fn)
+  x$prop_vax <- gsub(".+scenario-([0-9.]+)[.]rds", "\\1", fn) |> as.numeric()
+  x$prop_vax <- x$prop_vax / 100
+  x
+  }) |> rbindlist()
+
+
+```
+
+### Probability of Outbreaks by Size
+
+The following figure shows the probability of observing outbreaks of different sizes (≥10, ≥50, and ≥100 cases) across different vaccination rates and intervention strategies.
+
+```{r}
+#| label: outbreak-probabilities
+#| echo: false
+#| warning: false
+#| message: false
+#| fig.width: 12
+#| fig.height: 8
+#| fig.cap: "Probability of observing outbreaks of different sizes by vaccination rate and intervention strategy"
+
+# Calculate outbreak probabilities
+outbreak_probs <- results %>%
+  group_by(prop_vax, strategy) %>%
+  summarise(
+    prob_10_plus = mean(total_infected >= 10, na.rm = TRUE),
+    prob_50_plus = mean(total_infected >= 50, na.rm = TRUE),
+    prob_100_plus = mean(total_infected >= 100, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("prob_"),
+    names_to = "outbreak_size",
+    values_to = "probability",
+    names_prefix = "prob_"
+  ) %>%
+  mutate(
+    outbreak_size = factor(
+      outbreak_size,
+      levels = c("10_plus", "50_plus", "100_plus"),
+      labels = c("≥10 cases", "≥50 cases", "≥100 cases")
+    ),
+    vaccination_label = paste0(prop_vax * 100, "% vaccinated")
+  )
+
+# Create the visualization
+ggplot(outbreak_probs, aes(x = outbreak_size, y = probability, fill = strategy)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
+  facet_wrap(~ vaccination_label, ncol = 2) +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_fill_brewer(palette = "Set2", name = "Strategy") +
+  labs(
+    title = "Probability of Outbreaks by Size",
+    subtitle = "Comparison across vaccination rates and intervention strategies",
+    x = "Outbreak Size Threshold",
+    y = "Probability"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.background = element_rect(fill = "gray90", color = NA),
+    strip.text = element_text(face = "bold", size = 11),
+    legend.position = "bottom",
+    legend.text = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11, color = "gray30")
+  )
 ```
 
 

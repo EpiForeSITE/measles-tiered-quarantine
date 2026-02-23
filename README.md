@@ -12,7 +12,7 @@ George G. Vega Yon, Ph.D.
 ## Description of the model
 
 We are using the `ModelMeaslesMixingRiskQuarantine()` model from the
-`epiworldR` package (version 0.10.0.0 or higher). This model uses a
+`epiworldR` package (version 0.12.0.0 or later). This model uses a
 mixing matrix to represent how agents’ interactions are distributed. In
 this case, groups represent classrooms in a school, so kids will have
 more interactions with kids in their own class than with kids from other
@@ -66,11 +66,23 @@ You can see the individual results of each scenario under the folder
 - [Scenario with 90% vaccination](scenarios/scenario-vax-0.90.md)
 - [Scenario with 95% vaccination](scenarios/scenario-vax-0.95.md)
 
+The overall results can be seen here:
+
+### Probability of Outbreaks by Size
+
+The following figure shows the probability of observing outbreaks of
+different sizes (≥10, ≥50, and ≥100 cases) across different vaccination
+rates and intervention strategies.
+
+![Probability of observing outbreaks of different sizes by vaccination
+rate and intervention
+strategy](README_files/figure-commonmark/outbreak-probabilities-1.png)
+
 # Version
 
-This analysis was performed using `epiworldR` version 0.11.2.0, with R
-version R version 4.5.1 (2025-06-13), and the `measles` R package
-version 0.1.0. You can get the latest version of `epiworldR` and the
+This analysis was performed using `epiworldR` version 0.12.0.0, with R
+version R version 4.5.2 (2025-10-31), and the `measles` R package
+version 0.1.1. You can get the latest version of `epiworldR` and the
 `measles` R package from GitHub at
 <https://github.com/UofUEpiBio/epiworldR> and
 <https://github.com/UofUEpiBio/measles>.
