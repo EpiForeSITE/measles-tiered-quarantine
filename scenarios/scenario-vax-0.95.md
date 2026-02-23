@@ -1,5 +1,10 @@
-# Measles Tiered Quarantine Simulations
+# Measles Tiered Quarantine Simulation – 95% Vaccination
 George G. Vega Yon, Ph.D.
+2025-10-23
+
+- [Description of the model](#description-of-the-model)
+- [Setup](#setup)
+- [Scenario: 95% vaccination](#scenario-95-vaccination)
 
 [![](https://github.com/EpiForeSITE/software/raw/e82ed88f75e0fe5c0a1a3b38c2b94509f122019c/docs/assets/foresite-software-badge.svg)](https://github.com/EpiForeSITE/software)
 
@@ -12,7 +17,7 @@ George G. Vega Yon, Ph.D.
 ## Description of the model
 
 We are using the `ModelMeaslesMixingRiskQuarantine()` model from the
-`epiworldR` package (version 0.12.0.0 or later). This model uses a
+`epiworldR` package (version 0.10.0.0 or higher). This model uses a
 mixing matrix to represent how agents’ interactions are distributed. In
 this case, groups represent classrooms in a school, so kids will have
 more interactions with kids in their own class than with kids from other
@@ -56,33 +61,68 @@ are as follows:
 - Contact tracing is assumed to be 100% effective, as agents’
   willingness to isolate and quarantine.
 
-## Results
+The following code block sets up some of the simulation parameters,
+including sourcing the simulator function in the file
+[`simulator.R`](./simulator.R):
 
-You can see the individual results of each scenario under the folder
-[`scenarios/`](./scenarios/):
+    Loading required package: epiworldR
 
-- [Scenario with 50% vaccination](scenarios/scenario-vax-0.50.md)
-- [Scenario with 80% vaccination](scenarios/scenario-vax-0.80.md)
-- [Scenario with 90% vaccination](scenarios/scenario-vax-0.90.md)
-- [Scenario with 95% vaccination](scenarios/scenario-vax-0.95.md)
+    Thank you for using epiworldR! Please consider citing it in your work.
+    You can find the citation information by running
+      citation("epiworldR")
 
-The overall results can be seen here:
+The particular disease parameters for measles, including the mixing
+matrix that will be used for the simulation, are defined as follows:
 
-### Probability of Outbreaks by Size
+We will test the model using the following scenarios:
 
-The following figure shows the probability of observing outbreaks of
-different sizes (≥10, ≥50, and ≥100 cases) across different vaccination
-rates and intervention strategies.
+- 50%, 80%, and 95% vaccination coverage.
+- Quarantine days set to 0, 7, 14, and 21 days.
 
-![Probability of observing outbreaks of different sizes by vaccination
-rate and intervention
-strategy](README_files/figure-commonmark/outbreak-probabilities-1.png)
+To assess the risk effect between different quarantine strategies, we
+report the probability of observing outbreaks of various sizes rather
+than means and medians. Specifically, we calculate:
 
-# Version
+- $P(\geq 10)$: Probability that an outbreak reaches 10 or more infected
+  individuals
+- $P(\geq 20)$: Probability that an outbreak reaches 20 or more infected
+  individuals
+- $P(\geq 50)$: Probability that an outbreak reaches 50 or more infected
+  individuals
 
-This analysis was performed using `epiworldR` version 0.12.0.0, with R
-version R version 4.5.2 (2025-10-31), and the `measles` R package
-version 0.1.1. You can get the latest version of `epiworldR` and the
-`measles` R package from GitHub at
-<https://github.com/UofUEpiBio/epiworldR> and
-<https://github.com/UofUEpiBio/measles>.
+This approach provides a clearer picture of the distribution’s tail
+behavior and allows for better comparison of risk across different
+strategies.
+
+## Scenario: 95% vaccination
+
+For this scenario, we simulate with 50% vaccination coverage and compare
+the following tiered quarantine strategies:
+
+- Baseline: No quarantine.
+- Stragety 1a: 21 days for all risk levels.
+- Strategy 1b: 21 days for high and medium risk, 14 days for low risk.
+- Strategy 1c: 21 days for high and medium risk, 0 days for low risk.
+- Strategy 2a: 14 days for all levels.
+- Strategy 2b: 14 days for high and medium risk, 7 days for low risk.
+- Strategy 2c: 14 days for high and medium risk, 0 days for low risk.
+
+| Scenario               | P(\>=10) | P(\>=50) | P(\>=100) |
+|:-----------------------|:---------|:---------|:----------|
+| Strategy 1a (21,21,21) | 0.02     | 0.00     | 0.00      |
+| Strategy 1b (21,21,14) | 0.01     | 0.00     | 0.00      |
+| Strategy 1c (21,21,0)  | 0.01     | 0.00     | 0.00      |
+| Strategy 2a (14,14,14) | 0.01     | 0.00     | 0.00      |
+| Strategy 2b (14,14,7)  | 0.01     | 0.00     | 0.00      |
+| Strategy 2c (14,14,0)  | 0.01     | 0.00     | 0.00      |
+| Baseline (0,0,0)       | 0.02     | 0.00     | 0.00      |
+
+Probability of outbreak sizes across different quarantine scenarios.
+
+We can also create a figure
+
+![](scenario-vax-0.95_files/figure-commonmark/figure-1.png)
+
+Same figure but directly comparing strategy 1a vs strategy 2a:
+
+![](scenario-vax-0.95_files/figure-commonmark/figure-1a-2a-1.png)

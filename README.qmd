@@ -1,11 +1,14 @@
 ---
 format: gfm
-title: Measles Tiered Quarantine Simulation
+title: Measles Tiered Quarantine Simulations
 author: George G. Vega Yon, Ph.D.
-date: 2025-10-23
-toc: true
-toc-location: body
 ---
+
+```{r}
+#| label: setup
+#| echo: false
+knitr::opts_chunk$set(echo = FALSE)
+```
 
 ```{=markdown}
 [![](https://github.com/EpiForeSITE/software/raw/e82ed88f75e0fe5c0a1a3b38c2b94509f122019c/docs/assets/foresite-software-badge.svg)](https://github.com/EpiForeSITE/software)
@@ -19,7 +22,7 @@ toc-location: body
 
 ## Description of the model
 
-We are using the `ModelMeaslesMixingRiskQuarantine()` model from the `epiworldR` package (version 0.10.0.0 or higher). This model uses a mixing matrix to represent how agents' interactions are distributed. In this case, groups represent classrooms in a school, so kids will have more interactions with kids in their own class than with kids from other classes.
+We are using the `ModelMeaslesMixingRiskQuarantine()` model from the `epiworldR` package (version 0.12.0.0 or later). This model uses a mixing matrix to represent how agents' interactions are distributed. In this case, groups represent classrooms in a school, so kids will have more interactions with kids in their own class than with kids from other classes.
 
 The model contains the full disease progression for measles, including the incubation period, prodromal phase, and rash phase. The model assumes that kids in the rash phase are isolated from their peers. Nonetheless, the model is calibrated to reflect the measles $\mathcal{R}_0$ of 15, so kids are infectious during the prodromal period. Agents can also become hospitalized.
 
@@ -40,232 +43,111 @@ Quarantine only applies to unvaccinated agents. The simulation settings are as f
 - The basic reproduction number (R0) is set to 15, reflecting the high transmissibility of measles.
 - Contact tracing is assumed to be 100% effective, as agents' willingness to isolate and quarantine.
 
-The following code block sets up some of the simulation parameters, including sourcing the simulator function in the file [`simulator.R`](./simulator.R):
+## Results
+
+You can see the individual results of each scenario under the folder [`scenarios/`](./scenarios/):
 
 ```{r}
-#| label: setup-paramters
-library(epiworldR)
+#| echo: false
+#| results: asis
+fns <- list.files("scenarios", pattern = "[.]md", full.names = TRUE)
+
+prop <- gsub(".+vax-([0-9.]+)[.]md", "\\1", fns)
+
+sprintf(
+  "- [Scenario with %s%% vaccination](%s)", as.numeric(prop) * 100,
+  fns
+  ) |>
+  paste(collapse = "\n") |>
+  cat()
+cat("\n")
+```
+
+The overall results can be seen here:
+
+```{r}
+#| label: results
+#| echo: false
+#| warning: false
+#| message: false
 library(data.table)
 library(ggplot2)
-source("simulator.R")
+library(dplyr)
+library(tidyr)
 
-# Simulation parameters
-n_sims    <- 2000
-n_agents  <- 600
-n_classes <- 20
-n_agents_per_class <- n_agents / n_classes
-n_days    <- 100
-n_threads <- 10
+fns <- list.files("scenarios", pattern = "[.]rds", full.names = TRUE)
+results <- lapply(fns, \(fn) {
+  x <- readRDS(fn)
+  x$prop_vax <- gsub(".+scenario-([0-9.]+)[.]rds", "\\1", fn) |> as.numeric()
+  x$prop_vax <- x$prop_vax / 100
+  x
+  }) |> rbindlist()
 
-# Makesure it's even
-stopifnot(n_agents_per_class %% 1 == 0)
+
 ```
 
-The particular disease parameters for measles, including the mixing matrix that will be used for the simulation, are defined as follows:
+### Probability of Outbreaks by Size
+
+The following figure shows the probability of observing outbreaks of different sizes (≥10, ≥50, and ≥100 cases) across different vaccination rates and intervention strategies.
 
 ```{r}
-#| label: disease-parameters
-# Disease parameters
-R0 <- 15
-contact_rate <- 20
-incubation <- 12
-prodromal   <- 4
-rash        <- 3
+#| label: outbreak-probabilities
+#| echo: false
+#| warning: false
+#| message: false
+#| fig.width: 12
+#| fig.height: 8
+#| fig.cap: "Probability of observing outbreaks of different sizes by vaccination rate and intervention strategy"
 
-# Creating the mixing matrix
-within_class_contact_rate <- 0.83
-between_class_contact_rate <- 1 - within_class_contact_rate
-
-contact_matrix <- matrix(
-  between_class_contact_rate / (n_classes - 1),
-  nrow = n_classes,
-  ncol = n_classes
-)
-diag(contact_matrix) <- within_class_contact_rate
-
-# Calibrating infection probability
-p_infect <- R0 / (contact_rate) * (1/prodromal)
-```
-
-We will test the model using the following scenarios:
-
-- 50%, 80%, and 95% vaccination coverage.
-- Quarantine days set to 0, 7, 14, and 21 days.
-
-To assess the risk effect between different quarantine strategies, we report the probability of observing outbreaks of various sizes rather than means and medians. Specifically, we calculate:
-
-- **P(≥10)**: Probability that an outbreak reaches 10 or more infected individuals
-- **P(≥20)**: Probability that an outbreak reaches 20 or more infected individuals
-- **P(≥50)**: Probability that an outbreak reaches 50 or more infected individuals
-
-This approach provides a clearer picture of the distribution's tail behavior and allows for better comparison of risk across different strategies.
-
-## Scenarios
-
-### Scenario: No vaccination, only one risk level quarantined
-
-```{r}
-#| label: no-vaccination-single-risk
-ans_none        <- simulator(duration = c(0L, 0L, 0L), vaccinated = 0.0)
-ans_only_high   <- simulator(duration = c(21L, 0L, 0L), vaccinated = 0.0)
-ans_only_medium <- simulator(duration = c(0L, 21L, 0L), vaccinated = 0.0)
-ans_only_low    <- simulator(duration = c(0L, 0L, 21L), vaccinated = 0.0)
-
-# Tabulating the results
-tabulator(
-  list(
-    "No Quarantine" = ans_none,
-    "Only High Risk Quarantine" = ans_only_high,
-    "Only Medium Risk Quarantine" = ans_only_medium,
-    "Only Low Risk Quarantine" = ans_only_low
+# Calculate outbreak probabilities
+outbreak_probs <- results %>%
+  group_by(prop_vax, strategy) %>%
+  summarise(
+    prob_10_plus = mean(total_infected >= 10, na.rm = TRUE),
+    prob_50_plus = mean(total_infected >= 50, na.rm = TRUE),
+    prob_100_plus = mean(total_infected >= 100, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("prob_"),
+    names_to = "outbreak_size",
+    values_to = "probability",
+    names_prefix = "prob_"
+  ) %>%
+  mutate(
+    outbreak_size = factor(
+      outbreak_size,
+      levels = c("10_plus", "50_plus", "100_plus"),
+      labels = c("≥10 cases", "≥50 cases", "≥100 cases")
+    ),
+    vaccination_label = paste0(prop_vax * 100, "% vaccinated")
   )
-)
-```
 
-### Scenario: 50% vaccination, tiered quarantine
-
-For this scenario, we simulate with 50% vaccination coverage and compare the following tiered quarantine strategies:
-
-- Baseline: 21 days for all risk levels.
-- Strategy 1: 21 days for high risk, 14 days for medium and low risk.
-- Strategy 2: 21 days for high risk, 7 days for medium and low risk.
-- Strategy 3: 21 days for high risk, no quarantine for medium and low risk.
-
-```{r}
-#| label: vaccination-50-tiered
-ans_50_baseline <- simulator(duration = c(21L, 21L, 21L), vaccinated = 0.5)
-ans_50_strategy1 <- simulator(duration = c(21L, 14L, 14L), vaccinated = 0.5)
-ans_50_strategy2 <- simulator(duration = c(21L, 7L, 7L), vaccinated = 0.5)
-ans_50_strategy3 <- simulator(duration = c(21L, 0L, 0L), vaccinated = 0.5)
-
-# Tabulating the results
-tabulator(
-  list(
-    "Baseline (21,21,21)" = ans_50_baseline,
-    "Strategy 1 (21,14,14)" =  ans_50_strategy1,
-    "Strategy 2 (21,7,7)" = ans_50_strategy2,
-    "Strategy 3 (21,0,0)" = ans_50_strategy3
+# Create the visualization
+ggplot(outbreak_probs, aes(x = outbreak_size, y = probability, fill = strategy)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7, alpha = 0.9) +
+  facet_wrap(~ vaccination_label, ncol = 2) +
+  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
+  scale_fill_brewer(palette = "Set2", name = "Strategy") +
+  labs(
+    title = "Probability of Outbreaks by Size",
+    subtitle = "Comparison across vaccination rates and intervention strategies",
+    x = "Outbreak Size Threshold",
+    y = "Probability"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.background = element_rect(fill = "gray90", color = NA),
+    strip.text = element_text(face = "bold", size = 11),
+    legend.position = "bottom",
+    legend.text = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 11, color = "gray30")
   )
-)
 ```
 
-### Scenario: 80% vaccination, tiered quarantine
-
-Similar to the previous scenario, we simulate with 80% vaccination coverage and compare the same tiered quarantine strategies:
-
-```{r}
-#| label: vaccination-80-tiered
-ans_80_baseline <- simulator(duration = c(21L, 21L, 21L), vaccinated = 0.8)
-ans_80_strategy1 <- simulator(duration = c(21L, 14L, 14L), vaccinated = 0.8)
-ans_80_strategy2 <- simulator(duration = c(21L, 7L, 7L), vaccinated = 0.8)
-ans_80_strategy3 <- simulator(duration = c(21L, 0L, 0L), vaccinated = 0.8)
-
-# Tabulating the results
-tabulator(
-  list(
-    "Baseline (21,21,21)" = ans_80_baseline,
-    "Strategy 1 (21,14,14)" =  ans_80_strategy1,
-    "Strategy 2 (21,7,7)" = ans_80_strategy2,
-    "Strategy 3 (21,0,0)" = ans_80_strategy3
-  )
-)
-```
-
-### Scenario: 90% vaccination, tiered quarantine
-
-Finally, we simulate with 90% vaccination coverage and compare the same tiered quarantine strategies:
-
-```{r}
-#| label: vaccination-90-tiered
-ans_90_baseline  <- simulator(duration = c(21L, 21L, 21L), vaccinated = 0.9)
-ans_90_strategy1 <- simulator(duration = c(21L, 14L, 14L), vaccinated = 0.9)
-ans_90_strategy2 <- simulator(duration = c(21L, 7L, 7L), vaccinated = 0.9)
-ans_90_strategy3 <- simulator(duration = c(21L, 0L, 0L), vaccinated = 0.9)
-
-# Tabulating the results
-tabulator(
-  list(
-    "Baseline (21,21,21)"   = ans_90_baseline,
-    "Strategy 1 (21,14,14)" = ans_90_strategy1,
-    "Strategy 2 (21,7,7)"   = ans_90_strategy2,
-    "Strategy 3 (21,0,0)"   = ans_90_strategy3
-  )
-)
-```
-
-### Scenario: Lower quarantine duration (14 days)
-
-For this scenario, we simulate with 80% vaccination coverage and a maximum quarantine duration of 14 days, comparing the same tiered quarantine strategies:
-
-```{r}
-#| label: vaccination-80-lower-duration
-ans_80_21_baseline  <- simulator(duration = c(21L, 21L, 21L), vaccinated = 0.8)
-ans_80_14_strategy1 <- simulator(duration = c(14L, 14L, 14L), vaccinated = 0.8)
-ans_80_14_strategy2 <- simulator(duration = c(14L, 10L, 10L), vaccinated = 0.8)
-ans_80_14_strategy3 <- simulator(duration = c(14L, 7L, 7L), vaccinated = 0.8)
-ans_80_14_strategy4 <- simulator(duration = c(14L, 0L, 0L), vaccinated = 0.8)
-
-# Tabulating the results
-tabulator(
-  list(
-    "Baseline (21,21,21)"   = ans_80_21_baseline,
-    "Strategy 1 (14,14,14)" =  ans_80_14_strategy1,
-    "Strategy 2 (14,10,10)" = ans_80_14_strategy2,
-    "Strategy 3 (14,7,7)"   = ans_80_14_strategy3,
-    "Strategy 4 (14,0,0)"   = ans_80_14_strategy4
-  )
-)
-```
-
-
-## Overall comparison
-
-Combining some of the results from different scenarios for a final comparison of the tiered quarantine strategies with 80% vaccination coverage:
-
-```{r}
-#| label: overall-comparison
-tabulator(
-  list(
-    "Baseline (21,21,21)"   = ans_80_21_baseline,
-    "Strategy 1 (14,14,14)" = ans_80_14_strategy1,
-    "Strategy 2 (14,10,10)" = ans_80_14_strategy2,
-    "Strategy 3 (14,7,7)"   = ans_80_14_strategy3
-  )
-)
-```
-
-The probability-based metrics provide a clearer picture of outbreak risk across different strategies. By examining the probability of reaching specific outbreak thresholds (10, 20, and 50 infected individuals), we can better assess the practical implications of each quarantine strategy. The distribution of total infected individuals can be further explored through density plots:
-
-```{r}
-#| label: overall-comparison-plot
-# We can group the four into a single plot (histogram)
-# for visual comparison
-combined_results <- rbind(
-  data.table(Scenario = "Baseline (21,21,21)", ans_80_21_baseline),
-  data.table(Scenario = "Strategy 1 (14,14,14)", ans_80_14_strategy1),
-  data.table(Scenario = "Strategy 2 (14,10,10)", ans_80_14_strategy2),
-  data.table(Scenario = "Strategy 3 (14,7,7)", ans_80_14_strategy3)
-)
-
-combined_results[total_infected < 50] |>
-  ggplot(aes(x = total_infected, color = Scenario)) +
-    geom_density(linewidth=1.5) +
-    labs(
-      title = "Distribution of Total Infected Individuals - Final Comparison",
-      x = "Total Infected Individuals",
-      y = "Frequency"
-    ) +
-    theme_minimal()
-```
-
-Looking at the density plot, we can see that the ordering of the distribution in outbreak sizes is consistent with the expected impact of the different quarantine strategies.
-
-# Discussion
-
-The model presented here is a simplification of reality trying to explore what a change in the quarantine strategy could mean for measles outbreaks in school settings. The results suggest that quarantine duration may be reduced without significantly increasing outbreak sizes in the context of a relatively high vaccination coverage (80% or higher). However, it is important to note that the model assumes perfect compliance with quarantine measures and does not account for community transmission outside the school setting.
-
-The mid-risk quarantine strategy--which applies to agents who are not in the same classroom but were in direct contact with an infected individual--shows a marginal effect on outbreak sizes. Nonetheless, this finding is contingent on the assumption that interactions happen randomly based on class assignments, so, in real-world scenarios where social networks and friendships play a significant role, the impact of mid-risk quarantine could be more pronounced. Because of this, it would be prudent to include mid-risk quarantine in the same category as high-risk quarantine until more detailed models are developed.
 
 # Version
 
-This analysis was performed using `epiworldR` version `r as.character(packageVersion("epiworldR"))`, with R version `r R.version.string`. You can get the latest version of `epiworldR` from GitHub at <https://github.com/UofUEpiBio/epiworldR>.
+This analysis was performed using `epiworldR` version `r as.character(packageVersion("epiworldR"))`, with R version `r R.version.string`, and the `measles` R package version `r as.character(packageVersion("measles"))`. You can get the latest version of `epiworldR` and the `measles` R package from GitHub at <https://github.com/UofUEpiBio/epiworldR> and <https://github.com/UofUEpiBio/measles>.

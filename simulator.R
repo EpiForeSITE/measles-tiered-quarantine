@@ -63,7 +63,7 @@ simulator <- function(
 #' @param sizes A numeric vector of outbreak size thresholds to compute probabilities for. Default is c(10, 20, 50).
 #' @return
 #' A formatted table summarizing the probability of outbreaks of various sizes.
-tabulator <- function(ans, sizes = c(10, 20, 50)) {
+tabulator <- function(ans, sizes = c(10, 50, 100)) {
   if (length(sizes) == 0 || !is.numeric(sizes) || any(sizes <= 0)) {
     stop("'sizes' must be a non-empty numeric vector with positive values")
   }
@@ -84,15 +84,17 @@ tabulator <- function(ans, sizes = c(10, 20, 50)) {
   
   # Add a column for each size threshold
   for (size in sizes) {
-    col_name <- paste0("P(≥", size, ")")
+    col_name <- paste0("P(>=", size, ")")
     result[[col_name]] <- sapply(
       scenario_names,
       function(x) sprintf(
-        "%.3f",
+        "%.2f",
         mean(ans[[x]]$total_infected >= size)
       )
     )
   }
   
-  result |> knitr::kable(caption = "Probability of outbreak sizes across different quarantine scenarios.")
+  result |> knitr::kable(
+    caption = "Probability of outbreak sizes across different quarantine scenarios."
+    )
 }

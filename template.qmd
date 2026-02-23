@@ -1,0 +1,250 @@
+---
+format: gfm
+title: Measles Tiered Quarantine Simulation -- `r sprintf("%.0f", params$vax_rate * 100)`% Vaccination
+author: George G. Vega Yon, Ph.D.
+date: 2025-10-23
+toc: true
+toc-location: body
+params:
+  vax_rate: 0.5
+  n_sims: 2000
+---
+
+```{r}
+#| label: setup
+#| echo: false
+knitr::opts_chunk$set(echo = FALSE)
+
+if (!exists("params")) {
+  params <- list(
+    vax_rate = 0.5,
+    n_sims = 2000
+    )
+}
+```
+
+```{=markdown}
+[![](https://github.com/EpiForeSITE/software/raw/e82ed88f75e0fe5c0a1a3b38c2b94509f122019c/docs/assets/foresite-software-badge.svg)](https://github.com/EpiForeSITE/software)
+
+> [!CAUTION]
+> This project is a work in progress. Use it at your own risk. **This model simulates a single school, so community transmission is not included**.
+
+> [!IMPORTANT]
+> The model makes several assumptions that may not hold in real-world scenarios. One important assumption is that interactions between agents are based solely on class assignments, and not based on friendship networks or other social structures. This assumption reflects strongly in the effect of mid-risk quarantine (see below for more details).
+```
+
+## Description of the model
+
+We are using the `ModelMeaslesMixingRiskQuarantine()` model from the `epiworldR` package (version 0.10.0.0 or higher). This model uses a mixing matrix to represent how agents' interactions are distributed. In this case, groups represent classrooms in a school, so kids will have more interactions with kids in their own class than with kids from other classes.
+
+The model contains the full disease progression for measles, including the incubation period, prodromal phase, and rash phase. The model assumes that kids in the rash phase are isolated from their peers. Nonetheless, the model is calibrated to reflect the measles $\mathcal{R}_0$ of 15, so kids are infectious during the prodromal period. Agents can also become hospitalized.
+
+The quarantine process is triggered when an agent is detected during the rash period. This could occur for more than one agent in the same step. Quarantine process only applies to unvaccinated agents, and the duration of quarantine depends on the risk level of the agent, as defined below.
+
+## Setup
+
+This document illustrates an experiment using the `epiworldR` package to simulate measles transmission under a tiered quarantine strategy. In the tier quarantine system, agents have different quarantine durations as a function of their risk level, which are defined as follows:
+
+- **High risk**: Agents in the same classroom as an infected individual.
+- **Medium risk**: Agents who were not in the same classroom as the infected individual, but were in direct contact with them.
+- **Low risk**: Agents who were not in the same classroom or direct contact with the infected individual.
+
+Quarantine only applies to unvaccinated agents. The simulation settings are as follows:
+
+- Individual school with 600 students distributed across 20 classes (30 students per class).
+- The contact rate is given by our previous estimates for within-class and between-class interactions: 83% of contacts occur within the same class, while 17% occur between different classes.
+- The basic reproduction number (R0) is set to 15, reflecting the high transmissibility of measles.
+- Contact tracing is assumed to be 100% effective, as agents' willingness to isolate and quarantine.
+
+The following code block sets up some of the simulation parameters, including sourcing the simulator function in the file [`simulator.R`](./simulator.R):
+
+```{r}
+#| label: setup-paramters
+library(measles)
+library(data.table)
+library(ggplot2)
+source("simulator.R")
+
+# Simulation parameters
+n_sims    <- params$n_sims
+n_agents  <- 600
+n_classes <- 20
+n_agents_per_class <- n_agents / n_classes
+n_days    <- 100
+n_threads <- 10
+
+# Makesure it's even
+stopifnot(n_agents_per_class %% 1 == 0)
+```
+
+The particular disease parameters for measles, including the mixing matrix that will be used for the simulation, are defined as follows:
+
+```{r}
+#| label: disease-parameters
+# Disease parameters
+R0           <- 15
+contact_rate <- 20
+incubation   <- 12
+prodromal    <- 4
+rash         <- 3
+
+# Creating the mixing matrix
+within_class_contact_rate  <- 0.83
+between_class_contact_rate <- 1 - within_class_contact_rate
+
+contact_matrix <- matrix(
+  between_class_contact_rate / (n_classes - 1),
+  nrow = n_classes,
+  ncol = n_classes
+)
+diag(contact_matrix) <- within_class_contact_rate
+
+# Calibrating infection probability
+p_infect <- R0 / (contact_rate) * (1/prodromal)
+```
+
+We will test the model using the following scenarios:
+
+- 50%, 80%, and 95% vaccination coverage.
+- Quarantine days set to 0, 7, 14, and 21 days.
+
+To assess the risk effect between different quarantine strategies, we report the probability of observing outbreaks of various sizes rather than means and medians. Specifically, we calculate:
+
+- $P(\geq 10)$: Probability that an outbreak reaches 10 or more infected individuals
+- $P(\geq 20)$: Probability that an outbreak reaches 20 or more infected individuals
+- $P(\geq 50)$: Probability that an outbreak reaches 50 or more infected individuals
+
+This approach provides a clearer picture of the distribution's tail behavior and allows for better comparison of risk across different strategies.
+
+## Scenario: `r sprintf("%.0f", 100 * params$vax_rate)`% vaccination
+
+For this scenario, we simulate with 50% vaccination coverage and compare the following tiered quarantine strategies:
+
+- Baseline: No quarantine.
+- Stragety 1a: 21 days for all risk levels.
+- Strategy 1b: 21 days for high and medium risk, 14 days for low risk.
+- Strategy 1c: 21 days for high and medium risk, 0 days for low risk.
+- Strategy 2a: 14 days for all levels.
+- Strategy 2b: 14 days for high and medium risk, 7 days for low risk.
+- Strategy 2c: 14 days for high and medium risk, 0 days for low risk.
+
+```{r}
+#| label: vaccination-50-tiered
+vrate <- params$vax_rate
+
+fn_results <- sprintf("scenario-%.0f.rda", 100 * params$vax_rate)
+if (file.exists(fn_results)) {
+  load(fn_results)
+} else {
+  strategy_1a <- simulator(duration = c(21L, 21L, 21L), vaccinated = vrate)
+  strategy_1b <- simulator(duration = c(21L, 21L, 14L), vaccinated = vrate)
+  strategy_1c <- simulator(duration = c(21L, 21L, 0L), vaccinated = vrate)
+  strategy_2a <- simulator(duration = c(14L, 14L, 14L), vaccinated = vrate)
+  strategy_2b <- simulator(duration = c(14L, 14L, 7L), vaccinated = vrate)
+  strategy_2c <- simulator(duration = c(14L, 14L, 0L), vaccinated = vrate)
+  baseline <- simulator(duration = c(0, 0, 0), vaccinated = vrate)
+
+  save(
+    strategy_1a, strategy_1b, strategy_1c,
+    strategy_2a, strategy_2b, strategy_2c,
+    baseline,
+    file = sprintf("scenario-%.0f.rda", 100 * params$vax_rate)
+  )
+}
+
+# Tabulating the results
+tabulator(
+  list(
+    "Strategy 1a (21,21,21)" = strategy_1a,
+    "Strategy 1b (21,21,14)" = strategy_1b,
+    "Strategy 1c (21,21,0)"  = strategy_1c,
+    "Strategy 2a (14,14,14)" = strategy_2a,
+    "Strategy 2b (14,14,7)"  = strategy_2b,
+    "Strategy 2c (14,14,0)"  = strategy_2c,
+    "Baseline (0,0,0)"       = baseline
+  )
+)
+```
+
+We can also create a figure
+
+```{r}
+#| label: figure
+scenario <- rbind(
+  data.frame(Scenario = "Strategy 1a (21,21,21)", strategy_1a),
+  data.frame(Scenario = "Strategy 1b (21,21,14)", strategy_1b),
+  data.frame(Scenario = "Strategy 1c (21,21,0)", strategy_1c),
+  data.frame(Scenario = "Strategy 2a (14,14,14)", strategy_2a),
+  data.frame(Scenario = "Strategy 2b (14,14,7)", strategy_2b),
+  data.frame(Scenario = "Strategy 2c (14,14,0)", strategy_2c),
+  data.frame(Scenario = "Baseline (0,0,0)", baseline)
+)
+
+scenario$strategy <- ifelse(
+  grepl("Strategy 1", scenario$Scenario),
+  "Strategy 1 (21 days)", "Strategy 2 (14 days)"
+  )
+
+scenario$low_risk <- with(scenario, ifelse(
+  grepl("[0-9]a", Scenario), "Full length",
+  ifelse(grepl("[0-9]b", Scenario), "Half length", "No quarantine")
+))
+
+library(ggplot2)
+scenario |> 
+  subset(!grepl("Baseline", Scenario) & total_infected >= 10) |> 
+  ggplot(aes(x = total_infected, color = low_risk)) +
+  # geom_density(linewidth=1.5) +
+  # geom_histogram(position = "stack") +
+  # geom_freqpoly(linewidth = 1.5) +
+  stat_ecdf(linewidth = 1.5) +
+  facet_wrap(strategy ~ ., nrow = 2) +
+  labs(
+    title = paste(
+      "Distribution of Total Infected Individuals -",
+      sprintf("%.0f", 100 * params$vax_rate),
+      "% Vaccination"
+    ),
+    x = "Total Infected Individuals (log scale)",
+    y = "Frequency"
+  ) +
+  labs(color = "Quarantine of the low-risk group") +
+  scale_x_log10() +
+  theme_minimal()
+
+if (interactive()) {
+  ggsave("figure-50.png", width = 10, height = 6)
+}
+```
+
+Same figure but directly comparing strategy 1a vs strategy 2a:
+
+```{r}
+#| label: figure-1a-2a
+scenario |> 
+  subset(!grepl("Baseline", Scenario) & total_infected >= 10) |> 
+  subset(grepl("Strategy [12]a|Baseline", Scenario)) |>
+  ggplot(aes(x = total_infected, color = Scenario)) +
+  # geom_density(linewidth=1.5) +
+  # geom_histogram(position = "stack") +
+  # geom_freqpoly(linewidth = 1.5) +
+  stat_ecdf(linewidth = 1.5) +
+  # facet_wrap(strategy ~ ., nrow = 2) +
+  labs(
+    title = paste(
+      "Distribution of Total Infected Individuals -",
+      sprintf("%.0f", 100 * params$vax_rate),
+      "% Vaccination"
+    ),
+    x = "Total Infected Individuals (log scale)",
+    y = "Frequency"
+  ) +
+  # labs(color = "Strategy") +
+  scale_x_log10() +
+  theme_minimal()
+```
+
+```{r}
+#| labe: save-dat
+saveRDS(scenario, file = sprintf("scenario-%.0f.rds", 100 * params$vax_rate))
+```
