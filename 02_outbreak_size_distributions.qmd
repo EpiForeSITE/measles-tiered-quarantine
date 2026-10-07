@@ -1,0 +1,140 @@
+---
+title: "2. Outbreak-size distributions by quarantine strategy"
+subtitle: "Measles in Grantz schools, real SMART per-capita contact matrices, R0 = 12"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    df-print: kable
+    embed-resources: true
+  gfm:
+    echo: false        # GitHub version shows results only; code is in the .qmd
+    toc: true
+    toc-depth: 2
+execute:
+  warning: false
+  message: false
+---
+
+How big do outbreaks get under each quarantine strategy? For every
+vaccination level and one of 11 strategies (**high / medium / low-risk
+quarantine days**), we look at the full distribution of final outbreak sizes
+rather than a single probability.
+
+- **Histograms** are drawn as outlines, one coloured line per school, so the
+  three schools can be compared in the same panel. There is one panel per
+  strategy and one graph per vaccination level.
+- **Tables** give the probability of an outbreak of at least 10, 20 and 50
+  cases, for each school and strategy.
+
+::: {.callout-note}
+Model code lives in `measles_model.R`. Simulations are cached in
+`results/`, and PNG copies of every figure are saved to `figures/`.
+:::
+
+::: {.content-hidden when-format="markdown"}
+
+## Setup
+
+```{r setup}
+source("measles_model.R")
+
+K        <- 20                 # dashed line in the histograms
+TABLE_KS <- c(10, 20, 50)      # table: P(outbreak size >= each of these)
+VACCS <- c(0.50, 0.60, 0.70, 0.80, 0.85)      # one set of figures each
+
+STRATS <- c("21/21/21", "21/14/7", "21/7/7", "21/7/0",
+            "14/14/0",  "14/7/7",  "14/7/0", "14/0/0",
+            "7/7/0",    "7/0/0",   "0/0/0")
+
+HIST_BINWIDTH <- 5           # outbreak-size bin width (cases)
+
+## Outline colours, one per school. Any R colour name ("red", "darkgreen")
+## or hex code ("#E69F00") works. Default: the same colours as file 3.
+HIST_COLORS <- SCHOOL_COLORS
+## Examples:
+## HIST_COLORS <- c(Elementary = "#D55E00", Middle = "#000000", High = "#56B4E9")
+HIST_COLORS <- c(Elementary = "#D55E00", Middle = "#0072B2", High = "#000000")    # 1. vermillion / blue / black (Okabe-Ito)
+# HIST_COLORS <- c(Elementary = "#4477AA", Middle = "#EE6677", High = "#228833")  # 2. blue / red / green (Paul Tol)
+HIST_LINEWIDTH <- 0.8        # outline thickness
+HIST_FACET_Y  <- "free_y"    # "fixed" to compare bar heights across panels
+```
+
+## Simulations
+
+Each school &times; vaccination &times; strategy combination is simulated once and reused
+by every figure and table below.
+
+```{r simulate}
+design <- cross_vacc(strategy_table(STRATS), VACCS)
+sims   <- run_or_load("distributions", simulate_design(design))
+sims[, strategy := factor(strategy, levels = STRATS)]
+```
+
+```{r plot-functions}
+## Histogram outlines: for each school, the number of runs in each bin,
+## drawn as a step line (the outline a histogram's bars would have).
+hist_outline <- function(d) {
+  bw   <- HIST_BINWIDTH
+  edge <- seq(0, ceiling((max(sims$size) + 1) / bw) * bw, by = bw)
+  d[, left := floor(size / bw) * bw]
+  counts <- d[, .N, by = .(school, strategy, left)]
+  ## every bin for every school x strategy, including empty ones (count 0)
+  grid <- CJ(school = unique(d$school), strategy = unique(d$strategy),
+             left = head(edge, -1))
+  counts <- counts[grid, on = .(school, strategy, left)][is.na(N), N := 0L]
+  setorder(counts, school, strategy, left)
+  ## step path: start at 0, follow each bin's count, drop back to 0 at the end
+  counts[, {
+    .(x = c(0, left, max(edge), max(edge)),
+      y = c(0, N, last(N), 0))
+  }, by = .(school, strategy)]
+}
+
+plot_hist <- function(v) {
+  out <- hist_outline(copy(sims[vacc == v]))
+  ggplot(out, aes(x, y, colour = school)) +
+    geom_step(direction = "hv", linewidth = HIST_LINEWIDTH) +
+    geom_vline(xintercept = K, linetype = "longdash",
+               linewidth = 0.6, colour = "grey45") +
+    facet_wrap(~ strategy, ncol = 3, scales = HIST_FACET_Y) +
+    scale_colour_manual(values = HIST_COLORS, name = "School") +
+    ## same x-range in every panel and every graph
+    coord_cartesian(xlim = c(0, max(sims$size) + HIST_BINWIDTH), expand = FALSE) +
+    labs(x = "Final outbreak size", y = "Number of runs",
+         title = sprintf("Outbreak-size distribution by strategy, %s vaccinated",
+                         vacc_lab(v)),
+         subtitle = sprintf(paste0("Histogram outlines, bins of %d cases. ",
+                                   "Panels = high/medium/low quarantine days. Dashed line = %d cases"),
+                            HIST_BINWIDTH, K)) +
+    theme_measles(11) +
+    theme(legend.position = "top", panel.grid.major.x = element_blank())
+}
+
+
+```
+
+:::
+
+## Histograms, all schools
+
+::: {.panel-tabset}
+
+```{r histograms, results='asis', fig.width=11, fig.height=10}
+for (v in VACCS) {
+  cat("\n\n## ", vacc_lab(v), " vaccinated\n\n", sep = "")
+
+  p <- plot_hist(v)
+
+  print(save_fig(
+    p,
+    sprintf("fig_hist_all_schools_%02d.png", round(100 * v)),
+    11, 10
+  ))
+
+  cat("\n\n")
+
+}
+```

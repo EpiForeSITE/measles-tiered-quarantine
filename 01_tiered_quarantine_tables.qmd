@@ -1,0 +1,195 @@
+---
+title: "1. Tiered quarantine: outbreak probability tables"
+subtitle: "Measles in Grantz schools, real SMART per-capita contact matrices, R0 = 12"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    df-print: kable
+    embed-resources: true
+  gfm:
+    echo: false        # GitHub version shows results only; code is in the .qmd
+    toc: true
+    toc-depth: 2
+execute:
+  warning: false
+  message: false
+---
+
+Tiered-quarantine experiment using the three real per-capita SMART contact
+matrices (symmetrised for reciprocity, kept at real magnitude). R0 = 12 is
+reached through a per-school transmission rate, not by scaling the matrix.
+
+For each school we report **P(outbreak e 10 / 20 / 50 cases)** across
+vaccination coverage and quarantine strategies, written as
+**high / medium / low-risk contact quarantine days**.
+
+The diagnostic single-tier scenarios in the first table do not satisfy
+high e medium e low; that constraint is applied to every other analysis.
+
+**Difference from the reference.** Each strategy is compared with a reference
+scenario in the same school and at the same vaccination coverage: *No
+quarantine* for the no-vaccination table, and *21/21/21* for the tiered
+tables. The "Difference" columns give the strategy's outbreak probability
+minus the reference's, in **percentage points**, with a 95% confidence
+interval (Newcombe hybrid score method for a difference of two proportions).
+
+- A **positive** difference means more outbreaks than the reference; a
+  **negative** one means fewer.
+- If the interval **includes 0**, the strategy cannot be told apart from the
+  reference with this number of simulations.
+
+Every school × scenario is simulated with its own random seed, so the
+scenarios are independent samples, as the interval assumes. The interval
+reflects simulation (Monte Carlo) uncertainty only, not uncertainty in the
+model's assumptions.
+
+::: {.callout-note}
+Model code lives in `measles_model.R`. Simulations are cached in
+`results/`; delete the CSV to re-run. For a quick test render with
+`N_SIMS=200 quarto render 01_tiered_quarantine_tables.qmd`.
+:::
+
+::: {.content-hidden when-format="markdown"}
+
+## Setup
+
+```{r setup}
+source("measles_model.R")
+
+THRESHOLDS   <- c(10, 20, 50)                       # P(size >= K)
+VACCS_TIERED <- c(0.50, 0.60, 0.70, 0.80, 0.90, 0.95)
+REFERENCE    <- c(novac = "No quarantine", tiered = "21/21/21")
+```
+
+:::
+
+## Transmission rate check
+
+Each school gets its own transmission rate so that R0 = 12. The table checks
+this against `epiworldR::compute_reproduction_number()`.
+
+```{r r0-check}
+r0_check <- rbindlist(lapply(SCHOOLS, function(s) data.table(
+  School              = s,
+  Students            = sum(ENROLLMENT[[s]]),
+  `Transmission rate` = round(TRANS_RATE[[s]], 4),
+  R0 = round(epiworldR::compute_reproduction_number(
+         contact_matrix         = SCHOOL_CMAT[[s]],
+         transmission_prob      = TRANS_RATE[[s]],
+         infectious_period_days = INF_DAYS,
+         check_reciprocity      = TRUE)$R, 2)
+)))
+knitr::kable(r0_check)
+```
+
+::: {.content-hidden when-format="markdown"}
+
+## Scenarios
+
+```{r design}
+## A. No vaccination: which single tier is worth quarantining? (diagnostic)
+design_novac <- strategy_table(c(
+  "No quarantine"        = "0/0/0",
+  "Only high-risk (21d)" = "21/0/0",
+  "Only med-risk (21d)"  = "0/21/0",
+  "Only low-risk (21d)"  = "0/0/21"))
+design_novac[, vacc := 0]
+
+## B. Tiered strategies (all high >= medium >= low) at each coverage
+design_tiered <- cross_vacc(
+  strategy_table(c("21/21/21", "21/14/14", "21/7/7", "21/0/0")),
+  VACCS_TIERED)
+
+design <- rbind(data.table(set = "novac",  design_novac),
+                data.table(set = "tiered", design_tiered))
+```
+
+```{r simulate}
+## Each school x scenario gets its own seed, so scenarios are independent
+## samples (needed for the confidence intervals below)
+sims <- run_or_load("tables_indep_seeds",
+                    simulate_design(design, independent_seeds = TRUE))
+```
+
+```{r tabulate}
+## Number of runs with an outbreak (size >= K) for each threshold
+counts <- sims[, c(.(n = .N),
+                   setNames(lapply(THRESHOLDS, function(k) sum(size >= k)),
+                            paste0("x", THRESHOLDS))),
+               by = .(set, school, vacc, strategy)]
+
+## Attach the reference scenario's counts (same set, school and coverage)
+counts[, ref_name := REFERENCE[set]]
+ref <- counts[strategy == ref_name,
+              c(list(set = set, school = school, vacc = vacc, n_ref = n),
+                setNames(.SD, paste0("xr", THRESHOLDS))),
+              .SDcols = paste0("x", THRESHOLDS)]
+counts <- ref[counts, on = .(set, school, vacc)]
+
+## Difference of two independent proportions, p_new - p_ref,
+## with Newcombe's hybrid score 95% CI (built from two Wilson intervals)
+newcombe_diff <- function(x_new, n_new, x_ref, n_ref) {
+  p1 <- x_new / n_new;  p2 <- x_ref / n_ref
+  w1 <- wilson(x_new, n_new);  w2 <- wilson(x_ref, n_ref)
+  d  <- p1 - p2
+  list(diff = d,
+       lo   = d - sqrt((p1 - w1$lo)^2 + (w2$hi - p2)^2),
+       hi   = d + sqrt((w1$hi - p1)^2 + (p2 - w2$lo)^2))
+}
+
+fmt_pct  <- function(p) sprintf("%.1f%%", 100 * p)
+fmt_diff <- function(d) {
+  s <- function(v) sprintf("%+.1f", 100 * v)
+  sprintf("%s (%s to %s)", s(d$diff), s(d$lo), s(d$hi))
+}
+
+PROB_COLS <- paste0("P(\u2265", THRESHOLDS, ")")
+DIFF_COLS <- paste0("Difference P(\u2265", THRESHOLDS, ")")
+
+for (i in seq_along(THRESHOLDS)) {
+  x  <- counts[[paste0("x",  THRESHOLDS[i])]]
+  xr <- counts[[paste0("xr", THRESHOLDS[i])]]
+  counts[, (PROB_COLS[i]) := fmt_pct(x / n)]
+  counts[, (DIFF_COLS[i]) := ifelse(strategy == ref_name, "Reference",
+                                    fmt_diff(newcombe_diff(x, n, xr, n_ref)))]
+}
+
+counts[, strategy := factor(strategy, levels = unique(design$strategy))]
+setorder(counts, school, vacc, strategy)
+
+## One results table
+results_table <- function(d, first_col = "Strategy") {
+  knitr::kable(d[, c("strategy", PROB_COLS, DIFF_COLS), with = FALSE],
+               col.names = c(first_col, PROB_COLS, DIFF_COLS),
+               align = c("l", rep("r", length(PROB_COLS)), rep("r", length(DIFF_COLS))))
+}
+```
+
+:::
+
+## Results by school
+
+Differences are in percentage points with 95% confidence intervals.
+For example, **+3.1 (+1.2 to +5.0)** means the strategy has 3.1 percentage
+points more chance of that outbreak size than the reference.
+
+```{r results, results='asis'}
+for (s in SCHOOLS) {
+  cat("\n\n### ", s, "\n\n")
+
+  cat("**No vaccination: which single tier to quarantine** (compared with no quarantine)\n\n")
+  print(results_table(counts[school == s & set == "novac"], "Scenario"))
+
+  cat("\n\n**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at the same coverage\n\n")
+  ## A separate table per coverage level: a label inside a Markdown table
+  ## would end the table, so each coverage level gets its own
+  for (v in VACCS_TIERED) {
+    cat(sprintf("\n\n*%s vaccinated*\n\n", vacc_lab(v)))
+    print(results_table(counts[school == s & set == "tiered" & vacc == v]))
+  }
+}
+```
+
