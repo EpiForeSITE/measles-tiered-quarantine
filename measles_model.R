@@ -36,7 +36,7 @@ SEED     <- 221
 
 ## Simulations per scenario. Override for a quick test, e.g.
 ##   N_SIMS=200 quarto render 01_tiered_quarantine_tables.qmd
-N_SIMS <- as.integer(Sys.getenv("N_SIMS", unset = 2000))
+N_SIMS <- as.integer(Sys.getenv("N_SIMS", unset = 4000))
 
 ## Threads: use the SLURM allocation if there is one
 N_THREADS <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK",
@@ -105,7 +105,7 @@ TRANS_RATE <- vapply(SCHOOL_CMAT,
 ##    (everyone who is no longer susceptible at the last day)
 ## ---------------------------------------------------------------------
 
-simulator <- function(school, duration, vaccinated, nsims = N_SIMS) {
+simulator <- function(school, duration, vaccinated, nsims = N_SIMS, seed = SEED) {
 
   sizes <- ENROLLMENT[[school]]
   n     <- sum(sizes)
@@ -126,7 +126,7 @@ simulator <- function(school, duration, vaccinated, nsims = N_SIMS) {
   for (k in seq_along(sizes))
     m <- add_entity(m, entity("Grade", as.integer(sizes[k]), FALSE))
 
-  run_multiple(m, ndays = N_DAYS, nsims = nsims, seed = SEED,
+  run_multiple(m, ndays = N_DAYS, nsims = nsims, seed = seed,
                saver = make_saver("total_hist"),
                nthreads = N_THREADS, verbose = FALSE)
 
@@ -170,15 +170,26 @@ policy_grid <- function(vaccs, highs, meds, lows) {
 }
 
 ## Run every design row in every school. Returns one row per simulation.
-simulate_design <- function(design, schools = SCHOOLS) {
-  rbindlist(lapply(schools, function(s) {
+##
+## By default every scenario uses the same seed (SEED). Run k of one
+## scenario then starts from the same random numbers as run k of every
+## other scenario, which makes comparisons between scenarios less noisy.
+##
+## independent_seeds = TRUE gives every school x scenario its own seed,
+## so scenarios are independent samples. Use this whenever a statistical
+## test that assumes independence (e.g. Wilcoxon rank-sum) is applied.
+simulate_design <- function(design, schools = SCHOOLS, independent_seeds = FALSE) {
+  rbindlist(lapply(seq_along(schools), function(j) {
+    s <- schools[j]
     rbindlist(lapply(seq_len(nrow(design)), function(i) {
-      d <- design[i]
-      message(sprintf("%-10s | %3d/%d | vacc %3.0f%% | H/M/L = %d/%d/%d",
+      d    <- design[i]
+      seed <- if (independent_seeds) SEED + 1000L * j + i else SEED
+      message(sprintf("%-10s | %3d/%d | vacc %3.0f%% | H/M/L = %d/%d/%d | seed %d",
                       s, i, nrow(design), 100 * d$vacc,
-                      d$q_high, d$q_med, d$q_low))
-      data.table(school = s, d,
-                 size = simulator(s, c(d$q_high, d$q_med, d$q_low), d$vacc))
+                      d$q_high, d$q_med, d$q_low, seed))
+      data.table(school = s, d, seed = seed,
+                 size = simulator(s, c(d$q_high, d$q_med, d$q_low), d$vacc,
+                                  seed = seed))
     }))
   }))
 }
@@ -222,6 +233,19 @@ wilson <- function(x, n, z = 1.96) {
   ctr <- (p + z^2 / (2 * n)) / d
   hw  <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / d
   list(lo = ctr - hw, hi = ctr + hw)
+}
+
+## Difference of two independent proportions, p_new - p_ref, with
+## Newcombe's hybrid score 95% CI (built from two Wilson intervals).
+## x = number of runs with an outbreak, n = number of runs.
+## Assumes the two scenarios are independent (separate seeds).
+newcombe_diff <- function(x_new, n_new, x_ref, n_ref) {
+  p1 <- x_new / n_new;  p2 <- x_ref / n_ref
+  w1 <- wilson(x_new, n_new);  w2 <- wilson(x_ref, n_ref)
+  d  <- p1 - p2
+  list(diff = d,
+       lo   = d - sqrt((p1 - w1$lo)^2 + (w2$hi - p2)^2),
+       hi   = d + sqrt((w1$hi - p1)^2 + (p2 - w2$lo)^2))
 }
 
 pct      <- scales::percent

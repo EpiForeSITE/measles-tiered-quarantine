@@ -8,19 +8,30 @@ contact matrices (symmetrised for reciprocity, kept at real magnitude).
 R0 = 12 is reached through a per-school transmission rate, not by
 scaling the matrix.
 
-For each school we report **P(outbreak ≥ 10 / 20 / 50 cases)** across
+For each school we report **P(outbreak e 10 / 20 / 50 cases)** across
 vaccination coverage and quarantine strategies, written as **high /
 medium / low-risk contact quarantine days**.
 
 The diagnostic single-tier scenarios in the first table do not satisfy
-high ≥ medium ≥ low; that constraint is applied to every other analysis.
+high e medium e low; that constraint is applied to every other analysis.
 
-**Significance.** Each scenario’s full outbreak-size distribution is
-compared with a reference scenario using a two-sided Wilcoxon rank-sum
-test: *No quarantine* for the no-vaccination table, and *21/21/21* at
-the same coverage for the tiered table. Stars: \* p \< 0.05, \*\* p \<
-0.01, \*\*\* p \< 0.001. P-values are not adjusted for multiple
-comparisons.
+**Difference from the reference.** Each strategy is compared with a
+reference scenario in the same school and at the same vaccination
+coverage: *No quarantine* for the no-vaccination table, and *21/21/21*
+for the tiered tables. The “Difference” columns give the strategy’s
+outbreak probability minus the reference’s, in **percentage points**,
+with a 95% confidence interval (Newcombe hybrid score method for a
+difference of two proportions).
+
+- A **positive** difference means more outbreaks than the reference; a
+  **negative** one means fewer.
+- If the interval **includes 0**, the strategy cannot be told apart from
+  the reference with this number of simulations.
+
+Every school × scenario is simulated with its own random seed, so the
+scenarios are independent samples, as the interval assumes. The interval
+reflects simulation (Monte Carlo) uncertainty only, not uncertainty in
+the model’s assumptions.
 
 <div>
 
@@ -31,49 +42,6 @@ comparisons.
 > `N_SIMS=200 quarto render 01_tiered_quarantine_tables.qmd`.
 
 </div>
-
-## Contact matrices
-
-The model uses real per-capita contact matrices from the SMART
-(Pittsburgh) school contact study, one per school type. Each row is the
-grade of a student, and each column is the grade of the students they
-have contact with. The values below are the raw matrices. Before running
-the model, each matrix is symmetrised, `0.5 * (C + t(C))`, so that
-contacts are reciprocal. Their magnitude is kept as is; R0 = 12 is set
-through a per-school transmission rate instead.
-
-### Elementary school (grades K–5, 26 students per grade)
-
-| Grade | K | 1 | 2 | 3 | 4 | 5 |
-|:--|--:|--:|--:|--:|--:|--:|
-| **K** | 18.74 | 1.32 | 0.25 | 0.09 | 3.77 | 0.14 |
-| **1** | 1.14 | 24.52 | 3.06 | 0.02 | 0.17 | 0.00 |
-| **2** | 0.29 | 4.21 | 13.96 | 6.60 | 1.60 | 0.00 |
-| **3** | 0.08 | 0.02 | 5.03 | 17.49 | 9.57 | 0.02 |
-| **4** | 3.21 | 0.16 | 1.15 | 9.00 | 25.37 | 0.79 |
-| **5** | 0.21 | 0.00 | 0.00 | 0.03 | 1.39 | 32.42 |
-
-### Middle school (grades 5–8, 59 students per grade)
-
-| Grade | 5 | 6 | 7 | 8 |
-|:--|--:|--:|--:|--:|
-| **5** | 35.15 | 0.67 | 0.00 | 0.00 |
-| **6** | 0.61 | 27.91 | 0.00 | 0.00 |
-| **7** | 0.00 | 0.00 | 65.94 | 0.11 |
-| **8** | 0.00 | 0.00 | 0.17 | 31.32 |
-
-### High school (grades 9–12, 58 students per grade)
-
-| Grade | 9 | 10 | 11 | 12 |
-|:--|--:|--:|--:|--:|
-| **9** | 25.98 | 14.45 | 3.94 | 1.38 |
-| **10** | 12.12 | 20.71 | 6.04 | 2.42 |
-| **11** | 4.56 | 8.33 | 14.26 | 6.31 |
-| **12** | 1.89 | 3.97 | 7.48 | 14.97 |
-
-Most contacts happen within the same grade (the diagonal). Middle-school
-grades mix very little with each other, while high-school grades mix the
-most across grades.
 
 ## Transmission rate check
 
@@ -88,129 +56,213 @@ checks this against `epiworldR::compute_reproduction_number()`.
 
 ## Results by school
 
+Differences are in percentage points with 95% confidence intervals. For
+example, **+3.1 (+1.2 to +5.0)** means the strategy has 3.1 percentage
+points more chance of that outbreak size than the reference.
+
 ### Elementary
 
 **No vaccination: which single tier to quarantine** (compared with no
 quarantine)
 
-| Scenario             | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------------------|-------:|-------:|-------:|----------------:|:------------:|
-| No quarantine        |  0.979 |  0.979 |  0.977 |       Reference |  Reference   |
-| Only high-risk (21d) |  0.894 |  0.856 |  0.739 |         \<0.001 |    \*\*\*    |
-| Only med-risk (21d)  |  0.961 |  0.961 |  0.941 |         \<0.001 |    \*\*\*    |
-| Only low-risk (21d)  |  0.966 |  0.931 |  0.566 |         \<0.001 |    \*\*\*    |
+| Scenario             | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |      Difference P(≥20) |      Difference P(≥50) |
+|:---------------------|-------:|-------:|-------:|--------------------:|-----------------------:|-----------------------:|
+| No quarantine        |  97.4% |  97.4% |  97.2% |           Reference |              Reference |              Reference |
+| Only high-risk (21d) |  88.5% |  85.3% |  75.3% | -8.8 (-9.9 to -7.7) | -12.1 (-13.3 to -10.9) | -21.9 (-23.3 to -20.5) |
+| Only med-risk (21d)  |  96.0% |  96.0% |  94.5% | -1.3 (-2.1 to -0.5) |    -1.3 (-2.1 to -0.6) |    -2.7 (-3.6 to -1.8) |
+| Only low-risk (21d)  |  96.6% |  93.5% |  57.0% | -0.8 (-1.5 to -0.0) |    -3.9 (-4.8 to -3.0) | -40.3 (-41.9 to -38.6) |
 
-**Tiered strategies (H/M/L days) by vaccination coverage** (compared
-with 21/21/21)
-50% Vaccination
-| Coverage | Strategy | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------|:---------|-------:|-------:|-------:|----------------:|:------------:|
-| 50%      | 21/21/21 |  0.548 |  0.334 |  0.212 |       Reference |  Reference   |
-| 50%      | 21/14/14 |  0.572 |  0.342 |  0.184 |           0.905 |              |
-| 50%      | 21/7/7   |  0.634 |  0.448 |  0.203 |         \<0.001 |    \*\*\*    |
-| 50%      | 21/0/0   |  0.698 |  0.587 |  0.238 |         \<0.001 |    \*\*\*    |
-60% Vaccination
-| 60%      | 21/21/21 |  0.430 |  0.244 |  0.172 |       Reference |  Reference   |
-| 60%      | 21/14/14 |  0.464 |  0.250 |  0.146 |           0.356 |              |
-| 60%      | 21/7/7   |  0.524 |  0.320 |  0.144 |         \<0.001 |    \*\*\*    |
-| 60%      | 21/0/0   |  0.605 |  0.454 |  0.086 |         \<0.001 |    \*\*\*    |
-70% Vaccination
-| 70%      | 21/21/21 |  0.321 |  0.136 |  0.031 |       Reference |  Reference   |
-| 70%      | 21/14/14 |  0.330 |  0.142 |  0.021 |           0.442 |              |
-| 70%      | 21/7/7   |  0.386 |  0.192 |  0.026 |         \<0.001 |    \*\*\*    |
-| 70%      | 21/0/0   |  0.475 |  0.296 |  0.013 |         \<0.001 |    \*\*\*    |
-80% Vaccination
-| 80%      | 21/21/21 |  0.161 |  0.072 |  0.000 |       Reference |  Reference   |
-| 80%      | 21/14/14 |  0.186 |  0.069 |  0.000 |           0.397 |              |
-| 80%      | 21/7/7   |  0.226 |  0.059 |  0.000 |           0.010 |      \*      |
-| 80%      | 21/0/0   |  0.302 |  0.090 |  0.000 |         \<0.001 |    \*\*\*    |
-90% Vaccination
-| 90%      | 21/21/21 |  0.038 |  0.006 |  0.000 |       Reference |  Reference   |
-| 90%      | 21/14/14 |  0.034 |  0.002 |  0.000 |           0.678 |              |
-| 90%      | 21/7/7   |  0.041 |  0.002 |  0.000 |           0.135 |              |
-| 90%      | 21/0/0   |  0.059 |  0.004 |  0.000 |           0.014 |      \*      |
+**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at
+the same coverage
 
+*50% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|--------------------:|
+| 21/21/21 |  54.2% |  32.3% |  19.5% |              Reference |              Reference |           Reference |
+| 21/14/14 |  57.6% |  35.3% |  19.7% |    +3.3 (+1.2 to +5.5) |    +3.0 (+0.9 to +5.0) | +0.2 (-1.6 to +1.9) |
+| 21/7/7   |  61.7% |  44.0% |  20.5% |    +7.5 (+5.3 to +9.6) |  +11.7 (+9.6 to +13.8) | +1.0 (-0.7 to +2.8) |
+| 21/0/0   |  71.0% |  59.4% |  23.1% | +16.8 (+14.7 to +18.9) | +27.1 (+24.9 to +29.1) | +3.6 (+1.8 to +5.4) |
+
+*60% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|--------------------:|
+| 21/21/21 |  45.8% |  24.4% |  15.7% |              Reference |              Reference |           Reference |
+| 21/14/14 |  48.4% |  26.2% |  15.2% |    +2.6 (+0.4 to +4.8) |    +1.8 (-0.1 to +3.7) | -0.5 (-2.1 to +1.1) |
+| 21/7/7   |  53.2% |  33.0% |  15.1% |    +7.4 (+5.2 to +9.6) |   +8.6 (+6.7 to +10.6) | -0.6 (-2.1 to +1.0) |
+| 21/0/0   |  59.8% |  46.0% |   9.7% | +14.0 (+11.8 to +16.2) | +21.6 (+19.5 to +23.6) | -6.0 (-7.5 to -4.6) |
+
+*70% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|--------------------:|
+| 21/21/21 |  31.1% |  13.9% |   2.7% |              Reference |              Reference |           Reference |
+| 21/14/14 |  33.0% |  13.2% |   2.0% |    +1.9 (-0.1 to +3.9) |    -0.8 (-2.3 to +0.8) | -0.7 (-1.4 to -0.1) |
+| 21/7/7   |  39.8% |  18.7% |   2.5% |   +8.8 (+6.7 to +10.9) |    +4.7 (+3.1 to +6.4) | -0.2 (-1.0 to +0.4) |
+| 21/0/0   |  47.5% |  28.6% |   1.2% | +16.4 (+14.3 to +18.5) | +14.6 (+12.9 to +16.4) | -1.5 (-2.1 to -0.9) |
+
+*80% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|--------------------:|--------------------:|
+| 21/21/21 |  15.3% |   6.2% |   0.0% |              Reference |           Reference |           Reference |
+| 21/14/14 |  17.2% |   6.2% |   0.0% |    +1.9 (+0.3 to +3.5) | -0.1 (-1.2 to +1.0) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |  21.7% |   6.4% |   0.0% |    +6.4 (+4.7 to +8.1) | +0.2 (-0.9 to +1.2) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |  28.5% |   8.6% |   0.0% | +13.2 (+11.4 to +15.0) | +2.4 (+1.2 to +3.5) | +0.0 (-0.1 to +0.1) |
+
+*90% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   3.8% |   0.4% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |   3.9% |   0.4% |   0.0% | +0.1 (-0.7 to +1.0) | +0.0 (-0.3 to +0.3) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |   3.6% |   0.2% |   0.0% | -0.3 (-1.1 to +0.6) | -0.2 (-0.5 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |   5.9% |   0.2% |   0.0% | +2.0 (+1.1 to +3.0) | -0.2 (-0.5 to +0.0) | +0.0 (-0.1 to +0.1) |
+
+*95% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   1.2% |   0.0% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |   0.9% |   0.0% |   0.0% | -0.4 (-0.8 to +0.1) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |   1.0% |   0.0% |   0.0% | -0.2 (-0.7 to +0.3) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |   0.8% |   0.0% |   0.0% | -0.5 (-0.9 to -0.0) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
 
 ### Middle
 
 **No vaccination: which single tier to quarantine** (compared with no
 quarantine)
 
-| Scenario             | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------------------|-------:|-------:|-------:|----------------:|:------------:|
-| No quarantine        |  0.925 |  0.924 |  0.912 |       Reference |  Reference   |
-| Only high-risk (21d) |  0.673 |  0.540 |  0.314 |         \<0.001 |    \*\*\*    |
-| Only med-risk (21d)  |  0.927 |  0.926 |  0.913 |         \<0.001 |    \*\*\*    |
-| Only low-risk (21d)  |  0.930 |  0.928 |  0.910 |           0.006 |     \*\*     |
+| Scenario             | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |      Difference P(≥50) |
+|:---------------------|-------:|-------:|-------:|-----------------------:|-----------------------:|-----------------------:|
+| No quarantine        |  92.5% |  92.3% |  91.3% |              Reference |              Reference |              Reference |
+| Only high-risk (21d) |  68.5% |  54.0% |  32.7% | -23.9 (-25.6 to -22.3) | -38.2 (-40.0 to -36.5) | -58.6 (-60.2 to -56.8) |
+| Only med-risk (21d)  |  92.8% |  92.8% |  91.8% |    +0.4 (-0.7 to +1.5) |    +0.6 (-0.6 to +1.7) |    +0.5 (-0.7 to +1.7) |
+| Only low-risk (21d)  |  92.1% |  91.8% |  90.5% |    -0.4 (-1.5 to +0.8) |    -0.5 (-1.7 to +0.7) |    -0.8 (-2.1 to +0.4) |
 
-**Tiered strategies (H/M/L days) by vaccination coverage** (compared
-with 21/21/21)
+**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at
+the same coverage
 
-| Coverage | Strategy | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------|:---------|-------:|-------:|-------:|----------------:|:------------:|
-| 50%      | 21/21/21 |  0.370 |  0.187 |  0.132 |       Reference |  Reference   |
-| 50%      | 21/14/14 |  0.378 |  0.203 |  0.117 |           0.868 |              |
-| 50%      | 21/7/7   |  0.377 |  0.186 |  0.082 |           0.953 |              |
-| 50%      | 21/0/0   |  0.386 |  0.196 |  0.030 |           0.909 |              |
-60% Vaccination
-| 60%      | 21/21/21 |  0.282 |  0.124 |  0.100 |       Reference |  Reference   |
-| 60%      | 21/14/14 |  0.288 |  0.146 |  0.092 |           0.769 |              |
-| 60%      | 21/7/7   |  0.290 |  0.136 |  0.050 |           0.985 |              |
-| 60%      | 21/0/0   |  0.288 |  0.129 |  0.016 |           0.911 |              |
-70% Vaccination
-| 70%      | 21/21/21 |  0.163 |  0.066 |  0.062 |       Reference |  Reference   |
-| 70%      | 21/14/14 |  0.163 |  0.062 |  0.050 |           0.986 |              |
-| 70%      | 21/7/7   |  0.168 |  0.060 |  0.035 |           0.986 |              |
-| 70%      | 21/0/0   |  0.164 |  0.036 |  0.005 |           0.877 |              |
-80% Vaccination
-| 80%      | 21/21/21 |  0.080 |  0.043 |  0.018 |       Reference |  Reference   |
-| 80%      | 21/14/14 |  0.082 |  0.029 |  0.011 |           0.984 |              |
-| 80%      | 21/7/7   |  0.078 |  0.016 |  0.004 |           0.946 |              |
-| 80%      | 21/0/0   |  0.078 |  0.008 |  0.001 |           0.987 |              |
-90% Vaccination
-| 90%      | 21/21/21 |  0.020 |  0.018 |  0.000 |       Reference |  Reference   |
-| 90%      | 21/14/14 |  0.016 |  0.011 |  0.000 |           0.960 |              |
-| 90%      | 21/7/7   |  0.015 |  0.008 |  0.000 |           0.956 |              |
-| 90%      | 21/0/0   |  0.010 |  0.000 |  0.000 |           0.940 |              |
+*50% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |    Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|---------------------:|
+| 21/21/21 |  37.1% |  18.1% |  12.7% |           Reference |           Reference |            Reference |
+| 21/14/14 |  37.8% |  20.2% |  11.2% | +0.7 (-1.4 to +2.8) | +2.1 (+0.4 to +3.8) |  -1.4 (-2.9 to -0.0) |
+| 21/7/7   |  38.7% |  20.1% |   8.6% | +1.6 (-0.6 to +3.7) | +2.0 (+0.3 to +3.7) |  -4.1 (-5.5 to -2.8) |
+| 21/0/0   |  40.2% |  20.5% |   3.0% | +3.1 (+1.0 to +5.3) | +2.4 (+0.7 to +4.2) | -9.7 (-10.9 to -8.6) |
+
+*60% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |    Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|---------------------:|
+| 21/21/21 |  28.0% |  12.8% |  10.5% |           Reference |           Reference |            Reference |
+| 21/14/14 |  28.7% |  12.9% |   8.1% | +0.8 (-1.2 to +2.7) | +0.1 (-1.4 to +1.5) |  -2.4 (-3.7 to -1.2) |
+| 21/7/7   |  28.2% |  13.4% |   5.7% | +0.2 (-1.8 to +2.2) | +0.5 (-1.0 to +2.0) |  -4.9 (-6.1 to -3.7) |
+| 21/0/0   |  29.3% |  12.3% |   1.5% | +1.4 (-0.6 to +3.3) | -0.5 (-2.0 to +0.9) | -9.0 (-10.1 to -8.0) |
+
+*70% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |  16.0% |   6.4% |   6.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |  18.1% |   7.1% |   5.8% | +2.1 (+0.5 to +3.8) | +0.7 (-0.4 to +1.8) | -0.2 (-1.3 to +0.8) |
+| 21/7/7   |  17.8% |   6.2% |   3.5% | +1.9 (+0.2 to +3.5) | -0.2 (-1.3 to +0.9) | -2.5 (-3.4 to -1.6) |
+| 21/0/0   |  19.1% |   5.6% |   0.8% | +3.2 (+1.5 to +4.9) | -0.9 (-1.9 to +0.2) | -5.2 (-6.0 to -4.5) |
+
+*80% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   7.5% |   4.0% |   2.1% |           Reference |           Reference |           Reference |
+| 21/14/14 |   7.7% |   2.9% |   1.2% | +0.2 (-1.0 to +1.4) | -1.1 (-1.9 to -0.3) | -0.8 (-1.4 to -0.2) |
+| 21/7/7   |   7.3% |   1.9% |   0.9% | -0.2 (-1.3 to +1.0) | -2.1 (-2.8 to -1.3) | -1.1 (-1.7 to -0.6) |
+| 21/0/0   |   8.5% |   0.8% |   0.1% | +1.0 (-0.2 to +2.2) | -3.2 (-3.9 to -2.6) | -1.9 (-2.4 to -1.5) |
+
+*90% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   2.0% |   1.5% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |   1.6% |   1.1% |   0.0% | -0.4 (-1.0 to +0.2) | -0.4 (-0.9 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |   1.3% |   0.5% |   0.0% | -0.7 (-1.3 to -0.1) | -1.0 (-1.5 to -0.6) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |   0.9% |   0.1% |   0.0% | -1.1 (-1.6 to -0.6) | -1.4 (-1.8 to -1.0) | +0.0 (-0.1 to +0.1) |
+
+*95% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   1.3% |   0.0% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |   0.6% |   0.0% |   0.0% | -0.7 (-1.2 to -0.3) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |   0.3% |   0.0% |   0.0% | -1.0 (-1.4 to -0.6) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |   0.1% |   0.0% |   0.0% | -1.2 (-1.6 to -0.9) | +0.0 (-0.1 to +0.1) | +0.0 (-0.1 to +0.1) |
 
 ### High
 
 **No vaccination: which single tier to quarantine** (compared with no
 quarantine)
 
-| Scenario             | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------------------|-------:|-------:|-------:|----------------:|:------------:|
-| No quarantine        |  0.974 |  0.974 |  0.974 |       Reference |  Reference   |
-| Only high-risk (21d) |  0.934 |  0.926 |  0.864 |         \<0.001 |    \*\*\*    |
-| Only med-risk (21d)  |  0.942 |  0.941 |  0.941 |         \<0.001 |    \*\*\*    |
-| Only low-risk (21d)  |  0.960 |  0.929 |  0.811 |         \<0.001 |    \*\*\*    |
+| Scenario             | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |      Difference P(≥50) |
+|:---------------------|-------:|-------:|-------:|--------------------:|--------------------:|-----------------------:|
+| No quarantine        |  98.1% |  98.1% |  98.0% |           Reference |           Reference |              Reference |
+| Only high-risk (21d) |  94.1% |  92.9% |  86.7% | -4.0 (-4.9 to -3.2) | -5.2 (-6.1 to -4.3) | -11.3 (-12.5 to -10.2) |
+| Only med-risk (21d)  |  94.4% |  94.3% |  94.2% | -3.7 (-4.6 to -2.9) | -3.7 (-4.6 to -2.9) |    -3.8 (-4.7 to -3.0) |
+| Only low-risk (21d)  |  96.1% |  93.2% |  80.8% | -2.0 (-2.7 to -1.3) | -4.9 (-5.8 to -4.0) | -17.2 (-18.5 to -15.9) |
 
-**Tiered strategies (H/M/L days) by vaccination coverage** (compared
-with 21/21/21)
+**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at
+the same coverage
 
-| Coverage | Strategy | P(≥10) | P(≥20) | P(≥50) | Overall p-value | Significance |
-|:---------|:---------|-------:|-------:|-------:|----------------:|:------------:|
-| 50%      | 21/21/21 |  0.588 |  0.454 |  0.284 |       Reference |  Reference   |
-| 50%      | 21/14/14 |  0.629 |  0.490 |  0.294 |           0.380 |              |
-| 50%      | 21/7/7   |  0.713 |  0.601 |  0.396 |         \<0.001 |    \*\*\*    |
-| 50%      | 21/0/0   |  0.794 |  0.736 |  0.535 |         \<0.001 |    \*\*\*    |
-60% Vaccination
-| 60%      | 21/21/21 |  0.534 |  0.374 |  0.220 |       Reference |  Reference   |
-| 60%      | 21/14/14 |  0.567 |  0.406 |  0.240 |           0.198 |              |
-| 60%      | 21/7/7   |  0.640 |  0.498 |  0.281 |         \<0.001 |    \*\*\*    |
-| 60%      | 21/0/0   |  0.725 |  0.628 |  0.367 |         \<0.001 |    \*\*\*    |
-70% Vaccination
-| 70%      | 21/21/21 |  0.402 |  0.245 |  0.158 |       Reference |  Reference   |
-| 70%      | 21/14/14 |  0.434 |  0.286 |  0.154 |           0.126 |              |
-| 70%      | 21/7/7   |  0.501 |  0.371 |  0.154 |         \<0.001 |    \*\*\*    |
-| 70%      | 21/0/0   |  0.603 |  0.474 |  0.160 |         \<0.001 |    \*\*\*    |
-80% Vaccination
-| 80%      | 21/21/21 |  0.278 |  0.137 |  0.048 |       Reference |  Reference   |
-| 80%      | 21/14/14 |  0.304 |  0.149 |  0.036 |           0.261 |              |
-| 80%      | 21/7/7   |  0.366 |  0.184 |  0.035 |         \<0.001 |    \*\*\*    |
-| 80%      | 21/0/0   |  0.454 |  0.272 |  0.028 |         \<0.001 |    \*\*\*    |
-90% Vaccination
-| 90%      | 21/21/21 |  0.083 |  0.040 |  0.000 |       Reference |  Reference   |
-| 90%      | 21/14/14 |  0.095 |  0.040 |  0.000 |           0.549 |              |
-| 90%      | 21/7/7   |  0.112 |  0.031 |  0.000 |           0.030 |      \*      |
-| 90%      | 21/0/0   |  0.168 |  0.024 |  0.000 |         \<0.001 |    \*\*\*    |
+*50% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |      Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|-----------------------:|
+| 21/21/21 |  62.3% |  48.1% |  30.4% |              Reference |              Reference |              Reference |
+| 21/14/14 |  65.1% |  50.8% |  31.4% |    +2.8 (+0.7 to +4.9) |    +2.7 (+0.6 to +4.9) |    +1.1 (-1.0 to +3.1) |
+| 21/7/7   |  71.5% |  60.2% |  41.0% |   +9.2 (+7.1 to +11.2) |  +12.1 (+9.9 to +14.3) |  +10.7 (+8.6 to +12.8) |
+| 21/0/0   |  81.0% |  76.0% |  55.2% | +18.7 (+16.8 to +20.6) | +27.9 (+25.8 to +29.9) | +24.8 (+22.7 to +26.9) |
+
+*60% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |      Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|-----------------------:|
+| 21/21/21 |  52.7% |  36.6% |  21.6% |              Reference |              Reference |              Reference |
+| 21/14/14 |  57.0% |  41.0% |  25.1% |    +4.3 (+2.1 to +6.5) |    +4.4 (+2.2 to +6.5) |    +3.4 (+1.6 to +5.3) |
+| 21/7/7   |  63.8% |  51.6% |  28.2% |  +11.1 (+8.9 to +13.2) | +15.0 (+12.8 to +17.1) |    +6.6 (+4.7 to +8.5) |
+| 21/0/0   |  72.5% |  64.7% |  38.8% | +19.8 (+17.7 to +21.9) | +28.1 (+26.0 to +30.2) | +17.2 (+15.2 to +19.1) |
+
+*70% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|--------------------:|
+| 21/21/21 |  41.7% |  24.5% |  16.6% |              Reference |              Reference |           Reference |
+| 21/14/14 |  44.7% |  28.4% |  16.1% |    +3.0 (+0.8 to +5.2) |    +3.9 (+2.0 to +5.9) | -0.5 (-2.1 to +1.1) |
+| 21/7/7   |  52.1% |  36.8% |  17.4% |  +10.4 (+8.2 to +12.5) | +12.3 (+10.3 to +14.3) | +0.9 (-0.8 to +2.5) |
+| 21/0/0   |  62.4% |  49.5% |  16.8% | +20.7 (+18.5 to +22.8) | +25.0 (+23.0 to +27.1) | +0.2 (-1.4 to +1.8) |
+
+*80% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |      Difference P(≥10) |      Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|-----------------------:|-----------------------:|--------------------:|
+| 21/21/21 |  25.4% |  11.6% |   4.3% |              Reference |              Reference |           Reference |
+| 21/14/14 |  29.2% |  14.9% |   3.3% |    +3.9 (+1.9 to +5.8) |    +3.2 (+1.8 to +4.7) | -1.0 (-1.8 to -0.1) |
+| 21/7/7   |  34.7% |  18.5% |   4.2% |   +9.4 (+7.4 to +11.4) |    +6.9 (+5.3 to +8.4) | -0.1 (-1.0 to +0.7) |
+| 21/0/0   |  44.4% |  26.6% |   2.5% | +19.1 (+17.0 to +21.1) | +15.0 (+13.3 to +16.7) | -1.8 (-2.6 to -1.0) |
+
+*90% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   8.9% |   4.7% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |  10.2% |   4.5% |   0.0% | +1.3 (-0.0 to +2.6) | -0.2 (-1.1 to +0.7) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |  13.4% |   3.5% |   0.0% | +4.5 (+3.1 to +5.9) | -1.2 (-2.1 to -0.4) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |  16.4% |   3.5% |   0.0% | +7.5 (+6.0 to +8.9) | -1.2 (-2.1 to -0.3) | +0.0 (-0.1 to +0.1) |
+
+*95% vaccinated*
+
+| Strategy | P(≥10) | P(≥20) | P(≥50) |   Difference P(≥10) |   Difference P(≥20) |   Difference P(≥50) |
+|:---------|-------:|-------:|-------:|--------------------:|--------------------:|--------------------:|
+| 21/21/21 |   2.7% |   0.1% |   0.0% |           Reference |           Reference |           Reference |
+| 21/14/14 |   3.0% |   0.2% |   0.0% | +0.3 (-0.4 to +1.1) | +0.1 (-0.1 to +0.3) | +0.0 (-0.1 to +0.1) |
+| 21/7/7   |   2.6% |   0.0% |   0.0% | -0.1 (-0.8 to +0.7) | -0.1 (-0.2 to +0.1) | +0.0 (-0.1 to +0.1) |
+| 21/0/0   |   3.8% |   0.1% |   0.0% | +1.1 (+0.4 to +1.9) | -0.0 (-0.2 to +0.1) | +0.0 (-0.1 to +0.1) |
