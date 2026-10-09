@@ -119,18 +119,18 @@ The results in this document were produced with `epiworldR` 0.10.0.0, where the 
 | Incubation period (`incubation_period`) | 12 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): exposure to prodrome averages 8–12 days. Defined as `incubation <- 12` in the setup code but not passed. |
 | Prodromal period (`prodromal_period`) | 4 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): prodrome 2–4 days; contagious 4 days before rash onset. Not passed; the same value (4) is used in the transmission calibration. |
 | Rash period (`rash_period`) | 3 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): contagious to 4 days after rash onset; infectivity minimal after day 2 of rash. Defined as `rash <- 3` but not passed. Only the infectious part of the rash is modeled. |
-| Hospitalization rate (`hospitalization_rate`) | 0.2 per day (default; a daily rate, not a probability: p = h / (h + 1/rash) = 0.2 / (0.2 + 1/3) ≈ 0.375) | Conservative value agreed with Utah DHHS; recent analyses use 10% per Jones et al. 2026, *NEJM Evid* 5(8), [doi:10.1056/EVIDpha2600141](https://doi.org/10.1056/EVIDpha2600141). |
+| Hospitalization rate (`hospitalization_rate`) | 0.2 per day (default; a daily rate, not a probability: p = h / (h + 1/rash) = 0.2 / (0.2 + 1/3) ≈ 0.375) | Assumption; recent analyses use 10% per Jones et al. 2026, *NEJM Evid* 5(8), [doi:10.1056/EVIDpha2600141](https://doi.org/10.1056/EVIDpha2600141). |
 | Hospitalization period (`hospitalization_period`) | 7 days (default) | Assumption. Observed stays are shorter (Utah mean 2.1 nights, Jones et al. 2026). |
 | Days undetected (`days_undetected`) | 2 days (default) | Assumption: about 2 days from active case to public-health notification. |
 | Isolation period (`isolation_period`) | 4 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): isolate until 4 days after rash onset. |
-| Isolation willingness (`isolation_willingness`) | 1 (default) | Assumption (field experience): perfect compliance, as stated in the Setup. |
-| Quarantine willingness (`quarantine_willingness`) | 1 (default) | Assumption (field experience): perfect compliance, as stated in the Setup. |
-| Contact-tracing success rate (`contact_tracing_success_rate`) | 1 (default) | Assumption (field experience): 100% effective contact tracing, as stated in the Setup. |
+| Isolation willingness (`isolation_willingness`) | 1 (default) | Assumption: perfect compliance, as stated in the Setup. |
+| Quarantine willingness (`quarantine_willingness`) | 1 (default) | Assumption: perfect compliance, as stated in the Setup. |
+| Contact-tracing success rate (`contact_tracing_success_rate`) | 1 (default) | Assumption: 100% effective contact tracing, as stated in the Setup. |
 | Contact-tracing window (`contact_tracing_days_prior` in `epiworldR` 0.10.0.0; `contact_tracing_days_window` in `measles`) | 7 days | Set explicitly to 7 in `simulator.R`. The rationale for 7 is not recorded. |
 | Detection rate in quarantine (`detection_rate_quarantine`) | 0 | Assumption. Set explicitly to 0 in `simulator.R`: prodromal agents in quarantine are never detected, so detection happens only through the rash. The rationale is not recorded. |
-| Quarantine period, high risk (`quarantine_period_high`) | 21 days in most scenarios; 0 or 14 in some | Our own experiments and discussions with Utah DHHS (experimental; no published source). Set explicitly per scenario. The 21-day tier matches the Utah DHHS standard quarantine (21 days since last exposure). |
-| Quarantine period, medium risk (`quarantine_period_medium`) | 0, 7, 10, 14 or 21 days (by scenario) | Our own experiments and discussions with Utah DHHS (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
-| Quarantine period, low risk (`quarantine_period_low`) | 0, 7, 10, 14 or 21 days (by scenario) | Our own experiments and discussions with Utah DHHS (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
+| Quarantine period, high risk (`quarantine_period_high`) | 21 days in most scenarios; 0 or 14 in some | Assumption (experimental; no published source). Set explicitly per scenario. The 21-day tier matches the Utah DHHS standard quarantine (21 days since last exposure). |
+| Quarantine period, medium risk (`quarantine_period_medium`) | 0, 7, 10, 14 or 21 days (by scenario) | Assumption (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
+| Quarantine period, low risk (`quarantine_period_low`) | 0, 7, 10, 14 or 21 days (by scenario) | Assumption (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
 
 ## Scenarios
 
