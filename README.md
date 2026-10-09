@@ -4,6 +4,7 @@ George G. Vega Yon, Ph.D.
 
 - [Description of the model](#description-of-the-model)
 - [Setup](#setup)
+- [Parameters & references](#parameters--references)
 - [Scenarios](#scenarios)
   - [Scenario: No vaccination, only one risk level
     quarantined](#scenario-no-vaccination-only-one-risk-level-quarantined)
@@ -148,6 +149,38 @@ than means and medians. Specifically, we calculate:
 This approach provides a clearer picture of the distribution’s tail
 behavior and allows for better comparison of risk across different
 strategies.
+
+## Parameters & references
+
+The table below lists every parameter of `ModelMeaslesMixingRiskQuarantine()` used in this analysis, including the ones left at their default value (marked "(default)"). **Value used** is what the simulations in this document ran with. The [`measles`](https://github.com/UofUEpiBio/measles) R package, which now hosts this model, keeps the canonical, cited parameter table: [`measles_parameters.csv`](https://github.com/UofUEpiBio/measles/blob/main/inst/extdata/measles_parameters.csv) (also available as `measles::measles_parameters()`; see the [parameters vignette](https://github.com/UofUEpiBio/measles/blob/main/vignettes/parameters.qmd)). Sources follow that table unless stated otherwise.
+
+The results in this document were produced with `epiworldR` 0.10.0.0, where the model still lived; parameters not passed explicitly took that version's defaults. The contact-tracing window argument was then called `contact_tracing_days_prior` (now `contact_tracing_days_window`). `epiworldR` 0.10.0.0 also had a `contact_rate` argument that the `measles` package removed; there, the contact matrix holds the expected number of contacts instead.
+
+| Parameter | Value used | Source |
+|---|---|---|
+| R0 (target) | 15 | Guerra et al. 2017, *Lancet Infect Dis* 17(12):e420–e428, [doi:10.1016/S1473-3099(17)30307-9](https://doi.org/10.1016/S1473-3099(17)30307-9). Midpoint of the 12–18 range. Not a model argument: used to calibrate the transmission probability (see below). |
+| Contact rate (`contact_rate`) | 20 contacts/day | Team assumption; no source is recorded for 20 contacts/day. Not passed to the model explicitly: the `epiworldR` 0.10.0.0 default formula `15 / transmission_rate / prodromal_period` gives 15 / 0.1875 / 4 = 20, the same value used in the calibration. |
+| Transmission probability (`transmission_rate`) | 0.1875 | Derived: R0 / (contact rate × prodromal period) = 15 / (20 × 4). The contact rate is fixed at 20 and the transmission probability is calibrated to R0 = 15. |
+| Contact matrix (`contact_matrix`) | 20 × 20 classes; 0.83 within class, 0.17 / 19 to each other class | Team estimate: "our previous estimates for within-class and between-class interactions"; no citation is recorded for the 83% / 17% split. Row-stochastic mixing proportions (`epiworldR` 0.10.0.0 semantics), multiplied by the contact rate of 20; in the `measles` package the equivalent input is 20 × this matrix (expected contacts per day). |
+| Population size (`n`) | 600 (20 classes of 30) | Scenario-specific input: a single school. |
+| Prevalence (`prevalence`) | 1 / 600 (one index case) | Scenario-specific input. |
+| Vaccination coverage (`prop_vaccinated`) | 0, 0.5, 0.8, 0.9 (by scenario) | Scenario-specific input (scenarios, not estimates). |
+| Vaccine efficacy (`vax_efficacy`) | 0.99 (`epiworldR` 0.10.0.0 default) | Liu et al. 2015, *BMC Public Health* 15:447, [doi:10.1186/s12889-015-1766-6](https://doi.org/10.1186/s12889-015-1766-6). Not passed explicitly, so the results used the `epiworldR` 0.10.0.0 default. |
+| Incubation period (`incubation_period`) | 12 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): exposure to prodrome averages 8–12 days. Defined as `incubation <- 12` in the setup code but not passed. |
+| Prodromal period (`prodromal_period`) | 4 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): prodrome 2–4 days; contagious 4 days before rash onset. Not passed; the same value (4) is used in the transmission calibration. |
+| Rash period (`rash_period`) | 3 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): contagious to 4 days after rash onset; infectivity minimal after day 2 of rash. Defined as `rash <- 3` but not passed. Only the infectious part of the rash is modeled. |
+| Hospitalization rate (`hospitalization_rate`) | 0.2 per day (default; a daily rate, not a probability: p = h / (h + 1/rash) = 0.2 / (0.2 + 1/3) ≈ 0.375) | Assumption; recent analyses use 10% per Jones et al. 2026, *NEJM Evid* 5(8), [doi:10.1056/EVIDpha2600141](https://doi.org/10.1056/EVIDpha2600141). |
+| Hospitalization period (`hospitalization_period`) | 7 days (default) | Assumption. Observed stays are shorter (Utah mean 2.1 nights, Jones et al. 2026). |
+| Days undetected (`days_undetected`) | 2 days (default) | Assumption: about 2 days from active case to public-health notification. |
+| Isolation period (`isolation_period`) | 4 days (default) | [Utah DHHS Measles Disease Plan](https://epi.utah.gov/wp-content/uploads/Measles-disease-plan.pdf): isolate until 4 days after rash onset. |
+| Isolation willingness (`isolation_willingness`) | 1 (default) | Assumption: perfect compliance, as stated in the Setup. |
+| Quarantine willingness (`quarantine_willingness`) | 1 (default) | Assumption: perfect compliance, as stated in the Setup. |
+| Contact-tracing success rate (`contact_tracing_success_rate`) | 1 (default) | Assumption: 100% effective contact tracing, as stated in the Setup. |
+| Contact-tracing window (`contact_tracing_days_prior` in `epiworldR` 0.10.0.0; `contact_tracing_days_window` in `measles`) | 7 days | Set explicitly to 7 in `simulator.R`. The rationale for 7 is not recorded. |
+| Detection rate in quarantine (`detection_rate_quarantine`) | 0 | Assumption. Set explicitly to 0 in `simulator.R`: prodromal agents in quarantine are never detected, so detection happens only through the rash. The rationale is not recorded. |
+| Quarantine period, high risk (`quarantine_period_high`) | 21 days in most scenarios; 0 or 14 in some | Assumption (experimental; no published source). Set explicitly per scenario. The 21-day tier matches the Utah DHHS standard quarantine (21 days since last exposure). |
+| Quarantine period, medium risk (`quarantine_period_medium`) | 0, 7, 10, 14 or 21 days (by scenario) | Assumption (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
+| Quarantine period, low risk (`quarantine_period_low`) | 0, 7, 10, 14 or 21 days (by scenario) | Assumption (experimental; no published source). Set explicitly per scenario; these lengths are what the experiment varies. |
 
 ## Scenarios
 
