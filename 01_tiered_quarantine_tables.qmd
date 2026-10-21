@@ -26,13 +26,10 @@ For each school we report **P(outbreak e 10 / 20 / 50 cases)** across
 vaccination coverage and quarantine strategies, written as
 **high / medium / low-risk contact quarantine days**.
 
-The diagnostic single-tier scenarios in the first table do not satisfy
-high e medium e low; that constraint is applied to every other analysis.
+All strategies satisfy high e medium e low.
 
-**Difference from the reference.** Each strategy is compared with a reference
-scenario in the same school and at the same vaccination coverage: *No
-quarantine* for the no-vaccination table, and *21/21/21* for the tiered
-tables. The "Difference" columns give the strategy's outbreak probability
+**Difference from the reference.** Each strategy is compared with *21/21/21*
+in the same school and at the same vaccination coverage. The "Difference" columns give the strategy's outbreak probability
 minus the reference's, in **percentage points**, with a 95% confidence
 interval (Newcombe hybrid score method for a difference of two proportions).
 
@@ -41,8 +38,9 @@ interval (Newcombe hybrid score method for a difference of two proportions).
 - If the interval **includes 0**, the strategy cannot be told apart from the
   reference with this number of simulations.
 
-Every school × scenario is simulated with its own random seed, so the
-scenarios are independent samples, as the interval assumes. The interval
+Every run of every school × scenario has its own random seed: all seeds are
+drawn at once from one starting seed (`SEED` in `measles_model.R`) without
+repeats, so the scenarios are independent samples, as the interval assumes. The interval
 reflects simulation (Monte Carlo) uncertainty only, not uncertainty in the
 model's assumptions.
 
@@ -61,7 +59,7 @@ source("measles_model.R")
 
 THRESHOLDS   <- c(10, 20, 50)                       # P(size >= K)
 VACCS_TIERED <- c(0.50, 0.60, 0.70, 0.80, 0.90, 0.95)
-REFERENCE    <- c(novac = "No quarantine", tiered = "21/21/21")
+REFERENCE    <- c(tiered = "21/21/21")
 ```
 
 :::
@@ -90,27 +88,20 @@ knitr::kable(r0_check)
 ## Scenarios
 
 ```{r design}
-## A. No vaccination: which single tier is worth quarantining? (diagnostic)
-design_novac <- strategy_table(c(
-  "No quarantine"        = "0/0/0",
-  "Only high-risk (21d)" = "21/0/0",
-  "Only med-risk (21d)"  = "0/21/0",
-  "Only low-risk (21d)"  = "0/0/21"))
-design_novac[, vacc := 0]
-
-## B. Tiered strategies (all high >= medium >= low) at each coverage
+## Tiered strategies (all high >= medium >= low) at each coverage
 design_tiered <- cross_vacc(
   strategy_table(c("21/21/21", "21/14/14", "21/7/7", "21/0/0")),
   VACCS_TIERED)
 
-design <- rbind(data.table(set = "novac",  design_novac),
-                data.table(set = "tiered", design_tiered))
+design <- data.table(set = "tiered", design_tiered)
 ```
 
 ```{r simulate}
-## Each school x scenario gets its own seed, so scenarios are independent
-## samples (needed for the confidence intervals below)
-sims <- run_or_load("tables_indep_seeds",
+## Every run of every school x scenario gets its own seed, so scenarios are
+## independent samples (needed for the confidence intervals below).
+## New cache name: the design changed, so results of the old design (with the
+## no-vaccination scenarios) must not be reused.
+sims <- run_or_load("tables_tiered",
                     simulate_design(design, independent_seeds = TRUE))
 ```
 
@@ -188,10 +179,7 @@ points more chance of that outbreak size than the reference.
 for (s in SCHOOLS) {
   cat("\n\n### ", s, "\n\n")
 
-  cat("**No vaccination: which single tier to quarantine** (compared with no quarantine)\n\n")
-  print(results_table(counts[school == s & set == "novac"], "Scenario"))
-
-  cat("\n\n**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at the same coverage\n\n")
+  cat("**Tiered strategies (high/medium/low days)**, compared with 21/21/21 at the same coverage\n\n")
   ## A separate table per coverage level: a label inside a Markdown table
   ## would end the table, so each coverage level gets its own
   for (v in VACCS_TIERED) {
@@ -200,4 +188,3 @@ for (s in SCHOOLS) {
   }
 }
 ```
-

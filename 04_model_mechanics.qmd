@@ -1,0 +1,467 @@
+---
+title: "9. How the model behaves: disease progression, quarantine and where infections come from"
+subtitle: "Averages and distributions over independent runs (no run-by-run comparison)."
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    df-print: kable
+    embed-resources: true
+  gfm:
+    echo: false
+    toc: true
+    toc-depth: 2
+execute:
+  warning: false
+  message: false
+---
+
+## What this document shows
+
+Every run here has its **own independent seed** (drawn once with
+`draw_seeds()` from `measles_model.R`), so runs are never compared one by one.
+Everything is a **summary over all runs** of a scenario:
+
+| Exhibit | Question it answers | Where in the paper |
+|---|---|---|
+| T1, C0, C6 | How long is each disease stage in the model, and how does that compare with real measles? | Methods / Supplement |
+| C1 | What does the *average* infected student go through, day by day? | Results (model behaviour) |
+| C2 | Where are contagious days spent: at school or at home? | Results (mechanism) |
+| R1 | After *q* days at home, what is the chance an infected student has still not had the rash, in the model and in real measles? | Methods / Discussion (the key model property) |
+| R2, C4 | Per outbreak: how many infected students are sent home, how many come back still infected, and how many contagious days they then spend at school | Results / Discussion (why the strategies differ) |
+| C5 | How much of a student's contagious period does quarantine cover? | Discussion |
+
+**How to report numbers.**
+
+- *Spread between students* (how variable the disease course is): **median (5th95th percentile)**, e.g. "latent period: median 8 days (5th95th percentile 134)".
+- *An average over runs* (how precisely it is estimated): **mean (95% CI)**, e.g. "students released still infected: 6.6 per outbreak (95% CI 6.36.9)".
+
+::: {.callout-note}
+Quick test: `N_RUNS=50 quarto render 09_model_behaviour.qmd`.
+Simulations are cached in `results/09_behaviour2_*.rds`; delete them to re-run.
+:::
+
+```{r setup}
+source("measles_model.R")
+library(data.table)
+library(ggplot2)
+
+## ---- Settings ---------------------------------------------------------------
+N_RUNS     <- as.integer(Sys.getenv("N_RUNS", unset = 1000))  # independent runs per school x strategy
+SEED_BEHAV <- SEED + 9L      # its own seed, so these runs are independent of the runs in 01
+STRATS     <- c("21/21/21", "21/14/14", "21/14/7", "21/7/7", "21/0/0")
+VACC       <- 0.70           # vaccination coverage used in this document
+PROG_STRAT <- "21/21/21"     # strategy used for the disease-progression table (T1, C0, C6)
+MIN_HOME   <- 7              # days in a row at home that count as a "real" quarantine
+## Real measles, for R1: infection -> symptom onset is log-normal with median
+## 12.5 days and dispersion 1.23 (Lessler et al. 2009, Lancet Infect Dis);
+## the rash follows about 3 days later (prodrome 2-4 days).
+REAL_MEDIAN   <- 12.5
+REAL_DISP     <- 1.23
+REAL_PRODROME <- 3
+Q_MARKS       <- c(1, 7, 14, 21)   # quarantine lengths marked in R1 (0-day quarantine = 1 day at home)
+MAX_K      <- 40             # days after infection drawn in C1
+
+COLS <- setNames(c("#1F4E79", "#3A7DBA", "#7FB2DE", "#E8A33D", "#C8531E"), STRATS)
+th <- theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+        plot.title.position = "plot", strip.text = element_text(face = "bold"))
+save_fig <- function(p, file, w, h) {
+  dir.create(FIG_DIR, showWarnings = FALSE, recursive = TRUE)
+  ggsave(file.path(FIG_DIR, file), p, width = w, height = h, dpi = 300, bg = "white")
+  p
+}
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
+```
+
+```{r functions}
+## ---- Model with a daily state recorder -------------------------------------
+rec <- new.env()
+build_model <- function(school, vacc, duration) {
+  sizes <- ENROLLMENT[[school]]; n <- sum(sizes)
+  m <- ModelMeaslesMixingRiskQuarantine(
+    n = n, prevalence = 1 / n,
+    contact_matrix = SCHOOL_CMAT[[school]], transmission_rate = TRANS_RATE[[school]],
+    prop_vaccinated = vacc, detection_rate_quarantine = 0.0,
+    contact_tracing_days_window = 7,
+    quarantine_period_high   = as.integer(duration[1]),
+    quarantine_period_medium = as.integer(duration[2]),
+    quarantine_period_low    = as.integer(duration[3]))
+  for (k in seq_along(sizes))
+    m <- add_entity(m, entity("Grade", as.integer(sizes[k]), FALSE))
+  f  <- function(m) rec$days[[length(rec$days) + 1L]] <- get_agents_states(m)
+  ge <- globalevent_fun(f, "State recorder")
+  rec$keep[[length(rec$keep) + 1L]] <- list(f, ge, m)   # keep R from garbage-collecting it
+  m <- add_globalevent(m, ge)
+  verbose_off(m)
+  m
+}
+parse_strat <- function(s) as.integer(strsplit(s, "/")[[1]])
+longest_run <- function(x) if (!length(x) || !any(x)) 0L else { r <- rle(x); max(r$lengths[r$values]) }
+
+QSTATES  <- c("Quarantined Susceptible", "Quarantined Latent", "Quarantined Prodromal", "Quarantined Recovered")
+CONTAG   <- c("Prodromal", "Quarantined Prodromal")
+RASHLIKE <- c("Rash", "Isolated", "Isolated Recovered", "Hospitalized")
+NOTICED  <- c("Isolated", "Isolated Recovered", "Hospitalized")
+CATS <- c("Latent, at school", "Latent, at home", "Contagious, at school",
+          "Contagious, at home", "Rash / isolated / hospital", "Recovered")
+cat_state <- function(x) fcase(x == "Latent", CATS[1], x == "Quarantined Latent", CATS[2],
+                               x == "Prodromal", CATS[3], x == "Quarantined Prodromal", CATS[4],
+                               x %in% RASHLIKE, CATS[5], default = CATS[6])
+
+## ---- One run -> small summaries --------------------------------------------
+one_run <- function(m, seed) {
+  rec$days <- list()
+  run(m, ndays = N_DAYS, seed = seed)
+  S  <- do.call(rbind, rec$days); nd <- nrow(S)
+  tr <- as.data.table(get_transmissions(m))[, .(date, source, target)]
+  isQ <- matrix(S %in% QSTATES, nd)
+
+  ## first detection: first day a rash is noticed (isolated, or straight to hospital);
+  ## the first students are sent home that same day
+  det <- which(rowSums(S == "Isolated" | S == "Isolated Recovered" | isQ) > 0)
+  fd  <- if (length(det)) min(det) else NA_integer_
+
+  ## infected students (first case excluded): stage durations and longest stay at home
+  inf <- tr[source >= 0]
+  st <- rbindlist(lapply(seq_len(nrow(inf)), function(k) {
+    i <- inf$target[k] + 1L; d0 <- inf$date[k]; x <- S[, i]; after <- seq_len(nd) > d0
+    cd <- which(x %in% CONTAG); rd <- which(x %in% RASHLIKE & after); nt <- which(x %in% NOTICED & after)
+    ## first stay at home while infected: when it started, and how it ended
+    qi <- x %in% c("Quarantined Latent", "Quarantined Prodromal")
+    s0 <- if (any(qi)) which(qi)[1] else NA_integer_
+    e0 <- if (is.na(s0)) NA_integer_ else { r <- which(!qi & seq_len(nd) > s0); if (length(r)) min(r) - 1L else nd }
+    back_inf <- !is.na(e0) && e0 < nd && x[e0 + 1L] %in% c("Latent", "Prodromal")   # back at school, still infected
+    data.table(
+      home_state      = if (is.na(s0)) NA_character_ else x[s0],      # state on the first day at home
+      since_inf       = s0 - d0,                                       # days since infection when sent home
+      rash_after_home = if (is.na(s0) || !length(rd)) NA_real_ else min(rd) - s0,  # days at home until the rash
+      home_late       = !is.na(s0) && s0 > N_DAYS - 45,                # too close to the end to follow up
+      back_inf        = back_inf,
+      back_contag     = if (back_inf) sum(x[(e0 + 1L):nd] == "Prodromal") else 0L,
+      latent          = if (length(cd)) min(cd) - d0 else NA_real_,
+      contagious      = if (length(cd)) length(cd) else NA_real_,
+      contag_home     = sum(x == "Quarantined Prodromal"),
+      inf_to_rash     = if (length(rd)) min(rd) - d0 else NA_real_,
+      rash_to_noticed = if (length(rd) && length(nt) && x[min(rd)] == "Rash") min(nt) - min(rd) else NA_real_,
+      stay            = longest_run(x %in% c("Quarantined Latent", "Quarantined Prodromal")))
+  }))
+
+  ## C1: state and place on each day since infection (counts)
+  jc <- rbindlist(lapply(seq_len(nrow(inf)), function(k) {
+    i <- inf$target[k] + 1L; d0 <- inf$date[k]; days <- d0:min(nd, d0 + MAX_K)
+    data.table(k = days - d0, cat = cat_state(S[days, i]))
+  }))
+  jc <- if (nrow(jc)) jc[, .N, by = .(k, cat)] else data.table(k = integer(), cat = character(), N = integer())
+
+  ## C2: contagious student-days at school before / after the first detection, and at home
+  pr <- S == "Prodromal"
+  cd <- data.table(before = if (is.na(fd)) sum(pr) else sum(pr[seq_len(fd), ]),
+                   after  = if (is.na(fd)) 0 else sum(pr[-seq_len(fd), , drop = FALSE]),
+                   home   = sum(S == "Quarantined Prodromal"))
+
+  ## R2 / C4: one row per outbreak (runs are independent, so these have valid CIs)
+  cd[, `:=`(size         = nrow(tr),
+            sent_inf     = if (nrow(st)) sum(!is.na(st$home_state)) else 0L,   # infected students sent home
+            back_inf     = if (nrow(st)) sum(st$back_inf) else 0L,             # ... who came back still infected
+            back_contag  = if (nrow(st)) sum(st$back_contag) else 0L)]         # their contagious days at school after
+  list(st = st, jc = jc, cd = cd)
+}
+
+## ---- One scenario (school x strategy): all its runs, in parallel, cached ------
+behaviour_scenario <- function(school, strategy, seeds) {
+  f <- file.path(RESULTS_DIR, sprintf("09_behaviour2_%s_%d_%s_n%d_seed%d.rds",
+                                      school, round(100 * VACC), gsub("/", "-", strategy),
+                                      length(seeds), SEED_BEHAV))
+  if (file.exists(f)) return(readRDS(f))
+  run_chunk <- function(s) {
+    m <- build_model(school, VACC, parse_strat(strategy))
+    lapply(s, function(sd) one_run(m, sd))
+  }
+  ncores <- max(1L, min(N_THREADS, length(seeds)))
+  chunks <- split(seeds, ceiling(seq_along(seeds) / ceiling(length(seeds) / ncores)))
+  out <- unlist(parallel::mclapply(chunks, run_chunk, mc.cores = ncores), recursive = FALSE)
+  tag <- function(d) d[, `:=`(school = school, strategy = strategy)]
+  res <- list(
+    st = tag(rbindlist(lapply(out, `[[`, "st"))),
+    jc = tag(rbindlist(lapply(out, `[[`, "jc"))[, .(N = sum(N)), by = .(k, cat)]),
+    cd = tag(rbindlist(lapply(out, `[[`, "cd"))),
+    n_runs = length(seeds))
+  saveRDS(res, f)
+  res
+}
+```
+
+```{r simulate}
+## One seed per run, all drawn at once without repeats: every run of every
+## school x strategy is independent.
+scen  <- CJ(school = SCHOOLS, strategy = STRATS, sorted = FALSE)
+seeds <- draw_seeds(nrow(scen), N_RUNS, SEED_BEHAV)
+R <- lapply(seq_len(nrow(scen)), function(j) behaviour_scenario(scen$school[j], scen$strategy[j], seeds[[j]]))
+
+ST <- rbindlist(lapply(R, `[[`, "st")); JC <- rbindlist(lapply(R, `[[`, "jc"))
+CD <- rbindlist(lapply(R, `[[`, "cd"))
+for (d in list(ST, JC, CD)) d[, `:=`(school = factor(school, SCHOOLS), strategy = factor(strategy, STRATS))]
+```
+
+Each school × strategy has **`r N_RUNS` independent runs** at
+**`r vacc_lab(VACC)`** vaccination coverage, `r N_DAYS` days each.
+Durations are measured on infected students other than the first case, and only
+for students whose stage ended within the `r N_DAYS` simulated days.
+
+## T1. Disease progression in the model
+
+```{r t1}
+summ <- function(v, lab, real) {
+  v <- v[!is.na(v)]; m <- mean(v); se <- sd(v) / sqrt(length(v))
+  data.table(Stage = lab, Students = length(v), `Median (days)` = median(v),
+             `5th-95th percentile` = sprintf("%g-%g", quantile(v, .05, type = 1), quantile(v, .95, type = 1)),
+             `Mean (95% CI)` = sprintf("%.1f (%.1f-%.1f)", m, m - 1.96 * se, m + 1.96 * se),
+             `Real measles` = real)
+}
+T1 <- ST[strategy == PROG_STRAT, rbind(
+  summ(latent,          "Infection to contagious (latent)",     "about 10-12 days"),
+  summ(contagious,      "Contagious, before rash (prodromal)",  "about 4 days (2-4)"),
+  summ(inf_to_rash,     "Infection to rash",                    "about 14 days (7-21)"),
+  summ(rash_to_noticed, "Rash at school to noticed",            "-")), by = school]
+setnames(T1, "school", "School")
+fwrite(T1, file.path(RESULTS_DIR, sprintf("09_T1_progression_n%d_seed%d.csv", N_RUNS, SEED_BEHAV)))
+knitr::kable(T1, align = "llrrrrl",
+             caption = sprintf("Disease progression in the model (%s, %s vaccinated). Median and 5th-95th percentile describe how much the course varies between students; mean (95%% CI) is the average and its precision.",
+                               PROG_STRAT, vacc_lab(VACC)))
+```
+
+**How to write it.** "In the model, the latent period had a median of X days
+(5th95th percentile AB), compared with about 1012 days for measles. Because
+each stage has a geometric duration (the same chance of moving on every day),
+the model produces many very short and some very long stages."
+
+## C0. Stage lengths compared with real measles
+
+```{r c0, fig.width=10, fig.height=6}
+rng <- melt(ST[strategy == PROG_STRAT], id.vars = "school",
+            measure.vars = c("latent", "contagious", "inf_to_rash"),
+            variable.name = "stage", value.name = "days")[!is.na(days)]
+rng <- rng[, .(med = median(days), mean = mean(days),
+               lo = quantile(days, .05, type = 1), hi = quantile(days, .95, type = 1),
+               q1 = quantile(days, .25, type = 1), q3 = quantile(days, .75, type = 1)), by = .(school, stage)]
+STAGE_LAB <- c(contagious = "Contagious period", latent = "Infection to contagious", inf_to_rash = "Infection to rash")
+rng[, yy := match(as.character(stage), names(STAGE_LAB))]
+real <- data.table(yy = 1:3, lo = c(2, 10, 7), hi = c(4, 12, 21))
+p <- ggplot(rng, aes(y = yy)) +
+  geom_rect(data = real, aes(xmin = lo, xmax = hi, ymin = yy - 0.35, ymax = yy + 0.35),
+            fill = "#D9EAD3", inherit.aes = FALSE) +
+  geom_linerange(aes(xmin = lo, xmax = hi), linewidth = 1, colour = "grey40") +
+  geom_linerange(aes(xmin = q1, xmax = q3), linewidth = 4, colour = "#3A7DBA") +
+  geom_point(aes(x = med), size = 3, colour = "white") +
+  geom_point(aes(x = mean), shape = 4, size = 3, stroke = 1.2) +
+  geom_text(aes(x = hi, label = sprintf("  %g-%g", lo, hi)), hjust = 0, size = 3.3) +
+  facet_wrap(~school, ncol = 1) +
+  scale_y_continuous(breaks = 1:3, labels = unname(STAGE_LAB)) +
+  scale_x_continuous(expand = expansion(mult = c(0.02, 0.12))) +
+  labs(x = "Days", y = NULL,
+       title = "How long each stage lasts in the model, compared with real measles",
+       subtitle = sprintf("Blue = middle 50%%, grey line = 5th-95th percentile (labelled), white dot = median, x = mean; green = typical real range. %s.", PROG_STRAT)) + th
+save_fig(p, "09_C0_progression_ranges.png", 10, 6)
+```
+
+## C6. Days from infection to rash
+
+```{r c6, fig.width=10, fig.height=4.5}
+c6 <- ST[strategy == PROG_STRAT & !is.na(inf_to_rash)]
+out <- c6[, .(lab = sprintf("%.0f%% outside 7-21 days", 100 * mean(!between(inf_to_rash, 7, 21)))), by = school]
+p <- ggplot(c6, aes(inf_to_rash)) +
+  annotate("rect", xmin = 7, xmax = 21, ymin = -Inf, ymax = Inf, fill = "#D9EAD3") +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "#3A7DBA", colour = "white") +
+  geom_text(data = out, aes(x = Inf, y = Inf, label = lab), hjust = 1.1, vjust = 1.5, size = 3.5) +
+  facet_wrap(~school, nrow = 1) +
+  scale_y_continuous(labels = scales::percent) + coord_cartesian(xlim = c(0, 60)) +
+  labs(x = "Days from infection to rash", y = "Share of infected students",
+       title = "Days from infection to rash: model vs real measles (green = 7-21 days)",
+       subtitle = sprintf("%s, %s vaccinated", PROG_STRAT, vacc_lab(VACC))) + th
+save_fig(p, "09_C6_infection_to_rash.png", 10, 4.5)
+```
+
+## C1. The average infected student, day by day
+
+For every infected student, day 0 is the day of infection. Each colour is the
+share of all infected students (all runs) in that state and place on that day.
+Only the red band, **contagious at school**, can infect anyone.
+
+```{r c1, fig.width=13, fig.height=8}
+## fill missing state/day combinations with 0 so the stacked areas line up
+JC <- JC[CJ(school = levels(JC$school), strategy = levels(JC$strategy), k = 0:MAX_K, cat = CATS),
+         on = .(school, strategy, k, cat)][is.na(N), N := 0]
+JC[, `:=`(school = factor(school, SCHOOLS), strategy = factor(strategy, STRATS))]
+JC[, share := N / sum(N), by = .(school, strategy, k)][, cat := factor(cat, CATS)]
+p <- ggplot(JC, aes(k, share, fill = cat)) + geom_area() +
+  facet_grid(school ~ strategy) +
+  scale_fill_manual(values = c("#BDBDBD", "#F3E3C3", "#C8531E", "#F2A27A", "#7A6FD0", "#E8EEF4"),
+                    name = NULL, drop = FALSE) +
+  scale_y_continuous(labels = scales::percent) + guides(fill = guide_legend(nrow = 1)) +
+  labs(x = "Days since the student was infected", y = "Share of infected students",
+       title = "The average infected student: state and place, day by day after infection",
+       subtitle = sprintf("%s vaccinated. Red = contagious at school (the only days that spread measles)", vacc_lab(VACC))) + th
+save_fig(p, "09_C1_average_journey.png", 13, 8)
+```
+
+## C2. Where contagious days are spent
+
+```{r c2, fig.width=10, fig.height=7}
+CD_LAB <- c(before = "At school, before first detection", after = "At school, after first detection",
+            home = "At home (quarantine)")
+c2 <- melt(CD[, lapply(.SD, mean), by = .(school, strategy), .SDcols = names(CD_LAB)],
+           id.vars = c("school", "strategy"))
+c2[, variable := factor(CD_LAB[as.character(variable)], CD_LAB)][, strategy := factor(strategy, rev(STRATS))]
+p <- ggplot(c2, aes(value, strategy, fill = variable)) + geom_col(width = 0.65) +
+  facet_wrap(~school, ncol = 1, scales = "free_x") +
+  scale_fill_manual(values = c("#B4B2A9", "#C8531E", "#F2D9A6"), name = NULL) +
+  labs(x = "Contagious student-days per outbreak (average over all runs)", y = NULL,
+       title = "Where contagious days are spent", subtitle = "Only contagious days at school can infect others") + th
+save_fig(p, "09_C2_contagious_days.png", 10, 7)
+
+## the same numbers with 95% CI, for the text
+ci <- function(v) { m <- mean(v); h <- 1.96 * sd(v) / sqrt(length(v)); sprintf("%.1f (%.1f-%.1f)", m, m - h, m + h) }
+knitr::kable(CD[, .(`At school, before detection` = ci(before), `At school, after detection` = ci(after),
+                    `At home` = ci(home), `Outbreak size` = ci(size)), by = .(School = school, Strategy = strategy)],
+             caption = "Contagious student-days per outbreak, mean (95% CI).")
+```
+
+## R1. Will an infected student still be infected when quarantine ends? Model vs real measles
+
+This is the property of the model that explains most of the results.
+
+For every infected student sent home **while still latent**, we count the days
+from their first day at home until their rash. The question is: after *q* days
+at home, what share have **still not had the rash**? Those students would
+return to school on day *q* still infected, and become contagious there.
+
+- **Model (solid lines, from the simulations):** each day a latent student
+  becomes contagious with the same chance (1/12), so the time *still to go* does not
+  depend on how long ago the student was infected. Students sent home 03, 47
+  or 8+ days after infection give nearly the same curve.
+- **Real measles (dashed lines):** infection to symptoms is log-normal (median
+  `r REAL_MEDIAN` days, dispersion `r REAL_DISP`), with the rash about
+  `r REAL_PRODROME` days later. A student infected a while ago is close to the rash, so
+  the time still to go *does* depend on when they were infected, and almost no one
+  is still pre-rash 21 days after exposure. That is why 21 days is the
+  standard quarantine.
+
+```{r r1, fig.width=10, fig.height=5.5}
+## model: empirical, from all students sent home while latent (all schools and strategies)
+lat <- ST[home_state == "Quarantined Latent" & !home_late]
+lat[, grp := cut(since_inf, c(-Inf, 3, 7, Inf), labels = c("0-3", "4-7", "8+"))]
+QQ <- 0:35
+model <- lat[, .(q = QQ, surv = vapply(QQ, function(q) mean(is.na(rash_after_home) | rash_after_home >= q), 0), n = .N), by = grp]
+
+## real measles: P(T > e + q | T > e), T = REAL_PRODROME + log-normal(median, dispersion)
+E_REP <- c("0-3" = 2, "4-7" = 6, "8+" = 10)        # a typical day since infection for each group
+real_surv <- function(t) plnorm(t - REAL_PRODROME, log(REAL_MEDIAN), log(REAL_DISP), lower.tail = FALSE)
+real <- rbindlist(lapply(names(E_REP), function(g) { e <- E_REP[[g]]
+  data.table(grp = g, q = QQ, surv = real_surv(e + QQ) / real_surv(e)) }))
+both <- rbind(model[, .(grp, q, surv, source = "Model")], real[, .(grp, q, surv, source = "Real measles")])
+N_GRP <- lat[, .N, keyby = grp][J(names(E_REP)), N]       # students in each group (model)
+N_GRP[is.na(N_GRP)] <- 0L
+GRP_LAB <- sprintf("sent home %s days after infection (n = %d)", names(E_REP), N_GRP)
+both[, grp := factor(grp, names(E_REP), GRP_LAB)]
+
+lab21 <- both[q == 21, .(surv = mean(surv)), by = source]
+p <- ggplot(both, aes(q, surv, colour = grp, linetype = source)) +
+  geom_vline(xintercept = Q_MARKS, colour = "grey80") +
+  annotate("text", x = Q_MARKS, y = 1.04, label = paste(Q_MARKS, "d"), size = 3.2, colour = "grey40") +
+  geom_line(linewidth = 1) +
+  annotate("label", x = 21.5, y = lab21[source == "Model", surv] + 0.08, hjust = 0, size = 3.4,
+           label = sprintf("Model: %.0f%% still pre-rash after 21 days", 100 * lab21[source == "Model", surv])) +
+  annotate("label", x = 21.5, y = 0.06, hjust = 0, size = 3.4,
+           label = sprintf("Real measles: %.1f%%", 100 * lab21[source == "Real measles", surv])) +
+  scale_colour_manual(values = c("#1F4E79", "#E8A33D", "#C8531E"), name = NULL) +
+  scale_linetype_manual(values = c(Model = "solid", `Real measles` = "dashed"), name = NULL) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.06)) +
+  guides(colour = guide_legend(nrow = 1), linetype = guide_legend(nrow = 1)) +
+  labs(x = "Days at home (quarantine length)", y = "Share still without rash\n(would return to school infected)",
+       title = "Chance that a student sent home while latent is still pre-rash after q days at home",
+       subtitle = "Model: the same curve whenever the student was infected. Real measles: falls to almost 0 by 21 days.") + th +
+  theme(legend.box = "vertical")
+save_fig(p, "09_R1_still_infected_after_q.png", 10, 5.5)
+
+## the numbers at the marked quarantine lengths
+r1 <- dcast(both[q %in% Q_MARKS, .(surv = sprintf("%.0f%%", 100 * surv)), by = .(grp, source, q)],
+            source + grp ~ q, value.var = "surv")
+r1[, grp := as.character(grp)][source == "Real measles", grp := sub(" \\(n = .*\\)", "", grp)]  # real = calculated, no n
+setnames(r1, c("source", "grp", as.character(Q_MARKS)), c("", "Group", paste(Q_MARKS, "days at home")))
+knitr::kable(r1, caption = sprintf("Share still without rash after q days at home. Model: %d students sent home while latent, all schools and strategies (n per group in the Group column). Real measles: calculated, no students.", nrow(lat)))
+
+## how many students in each group, by school and strategy
+n_tab <- dcast(lat[, .N, by = .(School = school, Strategy = strategy, grp)],
+               School + Strategy ~ grp, value.var = "N", fill = 0)
+n_tab[, Total := rowSums(.SD), .SDcols = setdiff(names(n_tab), c("School", "Strategy"))]
+setnames(n_tab, names(E_REP), sprintf("Sent home %s days after infection", names(E_REP)), skip_absent = TRUE)
+knitr::kable(n_tab, caption = sprintf("Students sent home while latent, used in R1 (%d runs per school x strategy).", N_RUNS))
+```
+
+**How to write it.** "Each disease stage in the model has a geometric
+duration, so the time an infected student still has to go before the rash
+does not depend on how long ago they were infected. After 21 days at home,
+X% of students quarantined while latent had still not developed a rash,
+compared with under 1% expected for measles. These students return to school
+infected, which limits the benefit of longer quarantines (R2)."
+
+## R2. Per outbreak: infected students sent home, and how many came back still infected
+
+One number per outbreak, and outbreaks are independent runs, so the 95% CIs
+are valid.
+
+```{r r2}
+ci <- function(v) { m <- mean(v); h <- 1.96 * sd(v) / sqrt(length(v)); sprintf("%.1f (%.1f-%.1f)", m, m - h, m + h) }
+r2 <- CD[, .(`Outbreak size` = ci(size),
+             `Infected students sent home` = ci(sent_inf),
+             `... came back still infected` = ci(back_inf),
+             `Share came back infected` = sprintf("%.0f%%", 100 * sum(back_inf) / pmax(sum(sent_inf), 1)),
+             `Their contagious days at school` = ci(back_contag)),
+         by = .(School = school, Strategy = strategy)]
+fwrite(r2, file.path(RESULTS_DIR, sprintf("09_R2_per_outbreak_n%d_seed%d.csv", N_RUNS, SEED_BEHAV)))
+knitr::kable(r2, align = "llrrrrr",
+             caption = "Per outbreak, mean (95% CI) over independent runs. 'Came back still infected' = returned to school latent or contagious at the end of their first stay at home while infected.")
+```
+
+**How to read it.** Shorter quarantines send home about the same number of
+infected students, but more of them come back still infected and spend
+their contagious days at school. These extra contagious days at school are what
+make outbreaks larger.
+
+## C4. Students who come back from quarantine still infected
+
+```{r c4, fig.width=10, fig.height=4.5}
+c4 <- CD[, { m <- mean(back_inf); h <- 1.96 * sd(back_inf) / sqrt(.N)
+             .(mean = m, lo = m - h, hi = m + h) }, by = .(school, strategy)]
+p <- ggplot(c4, aes(strategy, mean, fill = strategy)) + geom_col(width = 0.6, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lo, ymax = hi), width = 0.2) +
+  geom_text(aes(y = hi, label = sprintf("%.1f", mean)), vjust = -0.5, size = 3.3) +
+  facet_wrap(~school, nrow = 1) + scale_fill_manual(values = COLS) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(x = NULL, y = "Students back at school still infected\n(per outbreak, mean and 95% CI)",
+       title = "Students who come back from quarantine still infected (latent or contagious)") + th +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+save_fig(p, "09_C4_released_infected.png", 10, 4.5)
+```
+
+## C5. How much of the contagious period quarantine covers
+
+```{r c5, fig.width=10, fig.height=4.5}
+STAY_LEV <- c("Never home", "1 day", sprintf("2-%d days", MIN_HOME - 1), sprintf("%d-20 days", MIN_HOME), "21+ days")
+c5 <- ST[!is.na(contagious) & contagious > 0][, stay_grp := factor(fcase(
+  stay == 0, STAY_LEV[1], stay == 1, STAY_LEV[2], stay < MIN_HOME, STAY_LEV[3],
+  stay <= 20, STAY_LEV[4], default = STAY_LEV[5]), STAY_LEV)]
+c5 <- c5[, .(share = sum(contag_home) / sum(contagious), n = .N), by = .(school, stay_grp)]
+p <- ggplot(c5, aes(stay_grp, share)) + geom_col(fill = "#3A7DBA", width = 0.6) +
+  geom_text(aes(label = sprintf("%.0f%%\nn=%d", 100 * share, n)), vjust = -0.2, size = 3) +
+  facet_wrap(~school, nrow = 1) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.2), breaks = seq(0, 1, .25)) +
+  labs(x = "Longest stay at home while infected", y = "Share of contagious days spent at home",
+       title = "How much of a student's contagious period quarantine covers",
+       subtitle = "All strategies pooled; n = infected students") + th +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+save_fig(p, "09_C5_coverage_by_stay.png", 10, 4.5)
+```
