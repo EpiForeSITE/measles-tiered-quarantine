@@ -137,20 +137,23 @@ readable.
 
 For each fixed high/medium policy: the fewest low-risk days that give
 80% of the benefit low-risk quarantine can provide. Each cell shows
-those days and the risk without → with them.
+those days and the risk without → with them. When low-risk quarantine
+cannot lower the risk by 2% or more, the cell shows **0 days**, the risk
+with no low-risk quarantine, and in brackets the largest drop any number
+of low-risk days gave.
 
 ![](md_figures/03_quarantine_policy_analysis-fig4-1.png)
 
 ### How sure is “not worth it”?
 
-A cell is *not worth it* when the largest benefit low-risk quarantine
-gives is under 2 percentage points. The tables below list only those
-cells, school by school. For each, the risk with 0 low-risk days is
-compared with the risk at the number of low-risk days that gave the
-largest benefit (or the longest allowed, if none helped), with a **95%
-confidence interval** for the benefit (Newcombe method for a difference
-of two proportions; every setting has its own seed, so the two risks are
-independent).
+A cell is *not worth it* (shown as **0 days** in Figure 4) when the
+largest benefit low-risk quarantine gives is under 2 percentage points.
+The tables below list only those cells, school by school. For each, the
+risk with 0 low-risk days is compared with the risk at the number of
+low-risk days that gave the largest benefit (or the longest allowed, if
+none helped), with a **95% confidence interval** for the benefit
+(Newcombe method for a difference of two proportions; every setting has
+its own seed, so the two risks are independent).
 
 - **Benefit** = risk with 0 low-risk days − risk with those days, in
   percentage points (positive = lower risk).

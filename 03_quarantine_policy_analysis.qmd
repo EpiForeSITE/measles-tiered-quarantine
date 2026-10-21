@@ -368,7 +368,10 @@ fig(p3, "fig3_policy_options.png", 11, 7)
 
 For each fixed high/medium policy: the fewest low-risk days that give
 `r pct(OPT_SHARE)` of the benefit low-risk quarantine can provide. Each cell
-shows those days and the risk without &rarr; with them.
+shows those days and the risk without &rarr; with them. When low-risk
+quarantine cannot lower the risk by `r pct(MIN_GAIN)` or more, the cell shows
+**0 days**, the risk with no low-risk quarantine, and in brackets the largest
+drop any number of low-risk days gave.
 
 ```{r fig4, fig.width=12, fig.height=5.8}
 d4 <- summ[q_med > 0, {
@@ -391,7 +394,10 @@ d4[, hm := factor(sprintf("High %d \u00b7 Med %d", q_high, q_med), levels = rev(
 
 p4 <- ggplot(d4, aes(vacc_lab, hm, fill = opt_low)) +
   geom_tile(colour = "white", linewidth = 1) +
-  geom_text(aes(label = ifelse(opt_low == 0, "Not\nworth it",
+  geom_text(aes(label = ifelse(opt_low == 0,
+                               sprintf("0 days\n%s (\u2212%s max)",
+                                       pct(risk0, accuracy = 1),
+                                       pct(risk0 - risk_max, accuracy = 0.1)),
                                sprintf("%d days\n%s \u2192 %s", opt_low,
                                        pct(risk0, accuracy = 1), pct(risk_opt, accuracy = 1))),
                 colour = opt_low > 10),
@@ -403,7 +409,7 @@ p4 <- ggplot(d4, aes(vacc_lab, hm, fill = opt_low)) +
   labs(x = "Students vaccinated", y = "Fixed policy (days)",
        title = "4. How many low-risk quarantine days are worth it?",
        subtitle = sprintf(
-         "Each cell: best number of low-risk days, and outbreak risk without \u2192 with them. \"Not worth it\" = risk drops less than %s",
+         "Each cell: best number of low-risk days, and outbreak risk without \u2192 with them.\n\"0 days\" = low-risk quarantine lowers the risk by less than %s (largest possible drop in brackets)",
          pct(MIN_GAIN))) +
   theme(panel.grid = element_blank())
 
@@ -412,8 +418,9 @@ fig(p4, "fig4_optimal_low.png", 12, 5.8)
 
 ### How sure is "not worth it"?
 
-A cell is *not worth it* when the largest benefit low-risk quarantine gives
-is under `r round(100 * MIN_GAIN)` percentage points. The tables below list
+A cell is *not worth it* (shown as **0 days** in Figure 4) when the largest
+benefit low-risk quarantine gives is under `r round(100 * MIN_GAIN)` percentage
+points. The tables below list
 only those cells, school by school. For each, the risk with 0 low-risk days
 is compared with the risk at the number of low-risk days that gave the
 largest benefit (or the longest allowed, if none helped), with a **95%
