@@ -1,0 +1,326 @@
+---
+title: "10b. Outbreak risk and quarantine burden, one table per school and vaccination"
+subtitle: "Strategies of file 10. New stage durations. For the slides."
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    df-print: kable
+    embed-resources: true
+  gfm:
+    echo: false
+    toc: true
+    toc-depth: 2
+execute:
+  warning: false
+  message: false
+---
+
+One table per school and vaccination level, one row per strategy (high /
+medium / low-risk quarantine days). **Every number is for one outbreak** (one
+run of 100 days starting with one infected student), computed in each run and
+averaged over the runs, never added up across runs. Uses the same runs as
+file 10 (same seeds): if file 10 has been rendered with the same `N_RUNS`,
+nothing is simulated again.
+
+| Column | Meaning |
+|:--|:--|
+| P(>10), P(>20) | Chance the outbreak ends with more than 10 / 20 cases |
+| Benefit vs 7/0/0 | P(>10) with 7/0/0 minus P(>10) with this strategy, percentage points (95% CI, Newcombe) |
+| Students sent home | Different students quarantined at least once |
+| Rounds | Days on which a new group is sent home |
+| Once / twice / 3+ | Of the students sent home, how many times each was sent home |
+| School days per student sent home | School days at home per student sent home (all their stays added) |
+| School days per unvaccinated student | School days missed per unvaccinated student (only they can be quarantined) |
+| vs 7/0/0: extra school days; cases prevented | Extra school days per unvaccinated student, and cases prevented per outbreak, compared with 7/0/0 |
+
+School days = calendar days &times; 5/7: the 100 simulated days are about 71
+school days, so no school-day column can be larger than 71.
+| Infected when sent home | Share of stays where the student was already infected |
+
+::: {.callout-note}
+Stays of only 1 day are not counted (a "0-day" tier still keeps a student
+home for 1 day). The low-risk tier is every other unvaccinated student, so
+any strategy with low-risk days sends every unvaccinated student home.
+:::
+
+```{r setup}
+source("measles_model_dur.R")    # new durations (and RASH_DAYS if set); measles_model.R unchanged
+library(data.table)
+library(ggplot2)
+if (!exists("vacc_lab")) vacc_lab <- function(v) paste0(round(100 * v), "%")
+if (!exists("N_THREADS")) N_THREADS <- as.integer(Sys.getenv("SLURM_CPUS_PER_TASK", unset = 1))
+
+## ---- Settings ----------------------------------------------------------------
+N_RUNS   <- as.integer(Sys.getenv("N_RUNS", unset = 1000))   # runs per school x vaccination x policy
+SEED_BUR <- SEED + 77L                                       # same seeds as file 10 (shares its cache)
+VACCS    <- c(0.60, 0.70, 0.80, 0.90)             # same as file 10
+POLS     <- c("7/0/0", "21/0/0", "21/14/0", "21/14/7", "21/7/7", "21/21/21")   # same as file 10
+REF_POL  <- "7/0/0"           # reference for benefit and cases prevented (minimal quarantine)
+K        <- 10L               # outbreak = more than K cases
+QST <- c("Quarantined Susceptible", "Quarantined Latent", "Quarantined Prodromal", "Quarantined Recovered")
+INF <- c("Quarantined Latent", "Quarantined Prodromal")
+
+COLS <- setNames(c("#C8531E", "#E8A33D", "#9ecae1", "#4292c6", "#7A6FD0", "#08306b"), POLS)
+VL   <- vacc_lab(VACCS)
+th <- theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(), plot.title.position = "plot", legend.position = "bottom",
+        strip.text = element_text(face = "bold"), plot.title = element_text(face = "bold"))
+save10 <- function(p, file, w, h) {
+  dir.create(FIG_DIR, showWarnings = FALSE, recursive = TRUE)
+  ggsave(file.path(FIG_DIR, file), p, width = w, height = h, dpi = 200, bg = "white"); p
+}
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
+
+## The burden-by-tier counters need the patched package with "Tracked" parameters
+local({
+  so <- file.path(find.package("measles"), "libs", "measles.so")
+  if (!length(grepRaw("Tracked ", readBin(so, "raw", file.info(so)$size), fixed = TRUE)))
+    stop("This measles package has no burden-by-tier counters; install the newest .hpp: ", so)
+})
+```
+
+```{r functions}
+## ---- Model with a daily state recorder --------------------------------------
+rec <- new.env()
+build_model <- function(school, vacc, d) {
+  sizes <- ENROLLMENT[[school]]
+  m <- ModelMeaslesMixingRiskQuarantine(
+    n = sum(sizes), prevalence = 1 / sum(sizes),
+    contact_matrix = SCHOOL_CMAT[[school]], transmission_rate = TRANS_RATE[[school]],
+    prop_vaccinated = vacc, detection_rate_quarantine = 0.0, contact_tracing_days_window = 7,
+    quarantine_period_high = d[1], quarantine_period_medium = d[2], quarantine_period_low = d[3])
+  for (g in sizes) m <- add_entity(m, entity("Grade", as.integer(g), FALSE))
+  f  <- function(m) rec$days[[length(rec$days) + 1L]] <- get_agents_states(m)
+  ge <- globalevent_fun(f, "State recorder")
+  rec$keep[[length(rec$keep) + 1L]] <- list(f, ge, m)    # keep R from garbage-collecting it
+  m <- add_globalevent(m, ge)
+  verbose_off(m)
+  m
+}
+
+## ---- One run -> burden measures ---------------------------------------------
+one_run <- function(m, seed, d) {
+  rec$days <- list()
+  run(m, ndays = N_DAYS, seed = seed)
+  S <- do.call(rbind, rec$days); nd <- nrow(S)
+  isQ <- matrix(S %in% QST, nd)
+  ## drop 1-day stays ("0-day" tiers), keep stays of 2+ days
+  for (i in which(colSums(isQ) > 0)) {
+    r <- rle(isQ[, i]); r$values[r$values & r$lengths == 1] <- FALSE; isQ[, i] <- inverse.rle(r)
+  }
+  inf   <- matrix(S %in% INF, nd) & isQ
+  entry <- isQ & rbind(FALSE, !isQ[-nd, , drop = FALSE])     # first day of each stay
+  stays <- colSums(entry); home <- rowSums(isQ); qd <- which(home > 0)
+
+  ## Burden by tier, exact: counted inside the model when each student is sent
+  ## home and on each day at home (patched package), read back as parameters
+  tp <- function(w) vapply(c("high", "medium", "low"), function(t) get_param(m, paste("Tracked", w, t)), 0)
+  tiers <- data.table(tier = c("High", "Medium", "Low"), students = tp("students"), stays = tp("stays"),
+                      days = tp("days"), inf = tp("infected stays"))
+  list(row = data.table(
+         size        = nrow(get_transmissions(m)),
+         rounds      = sum(rowSums(entry) > 0),
+         students_q  = sum(stays > 0), stays = sum(stays),
+         once = sum(stays == 1), twice = sum(stays == 2), more = sum(stays >= 3),
+         days_home   = sum(isQ), days_inf = sum(inf),
+         stays_inf   = sum(entry & inf),
+         peak        = max(home),
+         weeks       = if (length(qd)) (max(qd) - min(qd) + 1) / 7 else 0,
+         tracked     = sum(tiers$days)),          # days in tiers with more than 0 days
+       home = home, tiers = tiers)
+}
+
+## ---- One scenario: all its runs, in parallel, cached --------------------------
+burden_scenario <- function(school, vacc, pol, seeds) {
+  f <- file.path(RESULTS_DIR, sprintf("10_burden2_%s_%d_%s_n%d_seed%d.rds", school, round(100 * vacc),
+                                      gsub("/", "-", pol), length(seeds), SEED_BUR))
+  if (file.exists(f)) return(readRDS(f))
+  d <- as.integer(strsplit(pol, "/")[[1]])
+  nc <- max(1L, min(N_THREADS, length(seeds)))
+  ch <- split(seeds, ceiling(seq_along(seeds) / ceiling(length(seeds) / nc)))
+  out <- unlist(parallel::mclapply(ch, function(s) {
+    m <- build_model(school, vacc, d); lapply(s, function(x) one_run(m, x, d)) }, mc.cores = nc),
+    recursive = FALSE)
+  tag <- data.table(school = school, vacc = vacc, pol = pol)
+  tt  <- rbindlist(lapply(seq_along(out), function(k) out[[k]]$tiers[, run := k]))
+  res <- list(
+    runs  = cbind(tag, rbindlist(lapply(out, `[[`, "row"))),
+    home  = cbind(tag, data.table(day = seq_along(out[[1]]$home),
+                                  home = Reduce(`+`, lapply(out, `[[`, "home")) / length(out))),
+    tiers = cbind(tag, tt))                      # one row per run and tier
+  saveRDS(res, f)
+  res
+}
+```
+
+```{r simulate}
+scen <- CJ(school = SCHOOLS, vacc = VACCS, pol = POLS, sorted = FALSE)
+set.seed(SEED_BUR)              # one set.seed, all seeds at once, no repeats
+seeds <- split(sample.int(.Machine$integer.max, nrow(scen) * N_RUNS), rep(seq_len(nrow(scen)), each = N_RUNS))
+R <- lapply(seq_len(nrow(scen)), function(k) {
+  message(sprintf("%-10s %3.0f%% %s", scen$school[k], 100 * scen$vacc[k], scen$pol[k]))
+  burden_scenario(scen$school[k], scen$vacc[k], scen$pol[k], seeds[[k]])
+})
+RUNS  <- rbindlist(lapply(R, `[[`, "runs"))
+HOME  <- rbindlist(lapply(R, `[[`, "home"))
+TIERS <- rbindlist(lapply(R, `[[`, "tiers"))
+for (d in list(RUNS, HOME, TIERS))
+  d[, `:=`(school = factor(school, SCHOOLS), pol = factor(pol, POLS), vl = factor(vacc_lab(vacc), VL))]
+```
+
+`r N_RUNS` independent runs per school &times; vaccination &times; policy,
+`r nrow(scen)` settings in total.
+
+```{r summary}
+ci_mean <- function(v) { m <- mean(v); h <- 1.96 * sd(v) / sqrt(length(v)); c(m, m - h, m + h) }
+fmt_ci  <- function(v, dig = 1) { x <- ci_mean(v); sprintf(paste0("%.", dig, "f (%.", dig, "f%.", dig, "f)"), x[1], x[2], x[3]) }
+
+## Every measure is computed for EACH run (one outbreak) first, then averaged
+## over runs. Shares and per-stay measures only exist in runs where someone
+## was sent home; they are averaged over those runs (q_runs = how many).
+RUNS[, `:=`(
+  r_once        = fifelse(students_q > 0, once / students_q, NA_real_),
+  r_twice       = fifelse(students_q > 0, twice / students_q, NA_real_),
+  r_more        = fifelse(students_q > 0, more / students_q, NA_real_),
+  r_per_stay    = fifelse(stays > 0, days_home / stays * 5 / 7, NA_real_),         # school days
+  r_per_student = fifelse(students_q > 0, days_home / students_q * 5 / 7, NA_real_),
+  r_targeted    = fifelse(stays > 0, stays_inf / stays, NA_real_),
+  r_inf_days    = fifelse(days_home > 0, days_inf / days_home, NA_real_))]
+mn <- function(v) mean(v, na.rm = TRUE)
+## Unvaccinated students (only they can be quarantined) and school days
+## (the model runs 7 days a week: calendar days x 5/7; 100 days = 71 school days)
+RUNS[, nu := round(vapply(as.character(school), function(x) sum(ENROLLMENT[[x]]), 0) * (1 - vacc))]
+RUNS[, `:=`(u_days = days_home * 5 / 7 / nu, u_healthy = (days_home - days_inf) * 5 / 7 / nu,
+            u_inf = days_inf * 5 / 7 / nu)]
+
+SUM <- RUNS[, .(
+  x10 = sum(size > 10), x20 = sum(size > 20), n = .N,
+  risk        = mean(size > K),
+  cases       = mean(size),
+  rounds      = mean(rounds),
+  students_q  = mean(students_q),
+  q_runs      = sum(students_q > 0),
+  once        = mn(r_once),
+  twice       = mn(r_twice),
+  more        = mn(r_more),
+  days_home   = mean(days_home),
+  healthy     = mean(days_home - days_inf),
+  infected    = mean(days_inf),
+  inf_share   = mn(r_inf_days),
+  per_stay    = mn(r_per_stay),
+  per_student = mn(r_per_student),
+  peak        = mean(peak),
+  weeks       = mean(weeks),
+  zero_tier   = mean(pmax(days_home - tracked, 0)),   # back-to-back 1-day stays of 0-day tiers
+  targeted    = mn(r_targeted),
+  ## text with 95% CI over runs, for the tables
+  t_rounds = fmt_ci(rounds), t_students = fmt_ci(students_q, 0), t_days = fmt_ci(days_home, 0),
+  t_peak = fmt_ci(peak, 0), t_weeks = fmt_ci(weeks),
+  t_per_stay = fmt_ci(na.omit(r_per_stay)), t_per_student = fmt_ci(na.omit(r_per_student)),
+  u_days_m = mean(u_days), u_healthy = mean(u_healthy), u_inf = mean(u_inf), t_u_days = fmt_ci(u_days)),
+  by = .(school, vacc, vl, pol)]
+
+## Easier scales for schools: school days (the model runs 7 days a week, so
+## calendar days x 5/7), per unvaccinated student and per enrolled student
+SUM[, `:=`(n_enrolled = vapply(as.character(school), function(x) sum(ENROLLMENT[[x]]), 0))]
+SUM[, `:=`(n_unvacc     = round(n_enrolled * (1 - vacc)),
+           school_days  = days_home * 5 / 7)]
+SUM[, `:=`(per_unvacc   = school_days / n_unvacc,
+           per_enrolled = school_days / n_enrolled)]
+
+## Benefit vs the reference: P(>10) reference - P(>10) strategy, Newcombe 95% CI
+if (!exists("wilson")) wilson <- function(x, n, z = 1.96) {
+  p <- x / n; d <- 1 + z^2 / n; c <- (p + z^2 / (2 * n)) / d
+  h <- z * sqrt(p * (1 - p) / n + z^2 / (4 * n^2)) / d
+  list(lo = c - h, hi = c + h)
+}
+if (!exists("newcombe_diff")) newcombe_diff <- function(x_new, n_new, x_ref, n_ref) {
+  p1 <- x_new / n_new; p2 <- x_ref / n_ref
+  w1 <- wilson(x_new, n_new); w2 <- wilson(x_ref, n_ref); d <- p1 - p2
+  list(diff = d, lo = d - sqrt((p1 - w1$lo)^2 + (w2$hi - p2)^2),
+       hi = d + sqrt((w1$hi - p1)^2 + (p2 - w2$lo)^2))
+}
+rx <- SUM[pol == REF_POL, .(school, vacc, xr = x10, nr = n)]
+SUM <- rx[SUM, on = .(school, vacc)]
+bd  <- newcombe_diff(SUM$xr, SUM$nr, SUM$x10, SUM$n)      # ref - strategy = benefit
+SUM[, `:=`(benefit = bd$diff, ben_lo = bd$lo, ben_hi = bd$hi)]
+
+## Is it worth it? Extra days at home per case prevented, vs the reference policy
+ref <- SUM[pol == REF_POL, .(school, vacc, ref_cases = cases, ref_days = days_home, ref_u = u_days_m)]
+SUM <- ref[SUM, on = .(school, vacc)]
+SUM[, prevented := ref_cases - cases]
+SUM[, extra_u := u_days_m - ref_u]            # extra school days per unvaccinated student vs reference
+SUM[, per_case := fifelse(pol == REF_POL, NA_real_,
+                          fifelse(prevented > 0.1, (days_home - ref_days) / prevented, NA_real_))]
+fwrite(SUM, file.path(RESULTS_DIR, sprintf("10b_summary_n%d.csv", N_RUNS)))
+
+## Per tier, per outbreak (computed in each run, averaged over runs)
+TIERS[, tier := factor(tier, c("High", "Medium", "Low"))]
+TIERS[, nu := round(vapply(as.character(school), function(x) sum(ENROLLMENT[[x]]), 0) * (1 - vacc))]
+TSUM <- TIERS[, .(students = mean(students), stays = mean(stays), days = mean(days),
+                  days_u = mean(days * 5 / 7 / nu),
+                  t_students = fmt_ci(students, 0), t_days_u = fmt_ci(days * 5 / 7 / nu),
+                  per_student = mean(fifelse(students > 0, days / students * 5 / 7, NA_real_), na.rm = TRUE),
+                  inf_share   = mean(fifelse(stays > 0, inf / stays, NA_real_), na.rm = TRUE)),
+              by = .(school, vacc, vl, pol, tier)]
+TSUM[is.nan(per_student), per_student := NA][is.nan(inf_share), inf_share := NA]
+fwrite(TSUM, file.path(RESULTS_DIR, sprintf("10b_by_tier_n%d.csv", N_RUNS)))
+```
+
+
+## Tables for the slides
+
+One table per school and vaccination level.
+
+```{r slide-table}
+pc  <- function(x) sprintf("%.0f%%", 100 * x)
+pts <- function(x) sprintf("%+.0f", 100 * x)
+BT <- SUM[, .(
+  School = school, Vaccinated = vl, Strategy = factor(pol, POLS),
+  `P(>10)` = pc(x10 / n), `P(>20)` = pc(x20 / n),
+  `Benefit vs 7/0/0 (pts)` = fifelse(pol == REF_POL, "reference",
+                                     sprintf("%s (%s to %s)", pts(benefit), pts(ben_lo), pts(ben_hi))),
+  `Students sent home` = sprintf("%.0f", students_q),
+  Rounds = sprintf("%.1f", rounds),
+  `Once / twice / 3+` = sprintf("%s / %s / %s", pc(once), pc(twice), pc(more)),
+  `School days per student sent home` = sprintf("%.0f", per_student),
+  `School days per unvaccinated student` = sprintf("%.1f", u_days_m),
+  `vs 7/0/0: extra school days; cases prevented` = fifelse(pol == REF_POL, "reference",
+      sprintf("%+.1f; %s", extra_u, fifelse(prevented > 0.1, sprintf("%.1f", prevented), "none"))),
+  `Infected when sent home` = pc(targeted))]
+setorder(BT, School, Vaccinated, Strategy)
+fwrite(BT, file.path(RESULTS_DIR, sprintf("10b_slide_table_n%d.csv", N_RUNS)))
+```
+
+::: {.panel-tabset}
+
+```{r slide-tables, results='asis'}
+for (s in SCHOOLS) {
+  cat("\n\n### ", s, "\n\n")
+  for (v in VL) {
+    nu <- round(sum(ENROLLMENT[[s]]) * (1 - VACCS[VL == v]))
+    cat(sprintf("\n\n**%s school, %s vaccinated** (%d students, %d unvaccinated)\n\n", s, v, sum(ENROLLMENT[[s]]), nu))
+    print(knitr::kable(BT[School == s & Vaccinated == v, !c("School", "Vaccinated")],
+                       align = c("l", rep("r", 10))))
+  }
+  cat("\n\n")
+}
+```
+
+:::
+
+## Days at home by risk tier
+
+Exact counts from the model, per outbreak (averaged over runs).
+
+```{r tier-table}
+TT <- TSUM[students >= 0.05, .(School = school, Vaccinated = vl, Strategy = factor(pol, POLS), Tier = tier,
+            Students = sprintf("%.1f", students), `School days per student` = sprintf("%.0f", per_student),
+            `School days per unvaccinated student` = sprintf("%.1f", days_u), `Infected when sent home` = pc(inf_share))]
+setorder(TT, School, Vaccinated, Strategy, Tier)
+fwrite(TT, file.path(RESULTS_DIR, sprintf("10b_by_tier_table_n%d.csv", N_RUNS)))
+knitr::kable(TT)
+```
